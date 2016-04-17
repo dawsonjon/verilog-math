@@ -1,0 +1,353 @@
+"""A tool to generate pipelined logic from expressions"""
+import subprocess
+from math import ceil, log
+
+
+class Component:
+    """A component is a container object to which inputs, outputs,
+    combinational logic and registers may be added."""
+
+    def __init__(self):
+        self.inputs, self.outputs, self.streams, self.registers = [], [], [], []
+        self.sn = 0
+
+    def generate(self):
+
+        #align outputs
+        max_offset = max([i.stream.offset for i in self.outputs])
+        delays = [(not i.stream.constant) and max_offset - i.stream.offset for i in self.outputs]
+        for i, d in zip(self.outputs, delays):
+            if d:
+                i.stream = Register(i.stream, d)
+
+        return "".join([
+        "module dq (clk, q, d);\n",
+        "  input  clk;\n",
+        "  input  [width-1:0] d;\n",
+        "  output [width-1:0] q;\n",
+        "  parameter width=8;\n",
+        "  parameter depth=2;\n",
+        "  integer i;\n",
+        "  reg [width-1:0] delay_line [depth-1:0];\n",
+        "  always @(posedge clk) begin\n",
+        "    delay_line[0] <= d;\n",
+        "    for(i=1; i<depth; i=i+1) begin\n",
+        "      delay_line[i] <= delay_line[i-1];\n",
+        "    end\n",
+        "  end\n",
+        "  assign q = delay_line[depth-1];\n",
+        "endmodule\n\n",
+        "module uut(clk, ",
+        ", ".join(["%s"%i.iname for i in self.inputs+self.outputs]),
+        ");\n",
+        "  input clk;\n",
+        "".join(["  input [%s:0] %s;\n"%(i.bits-1, i.iname) for i in self.inputs]),
+        "".join(["  output [%s:0] %s;\n"%(i.bits-1, i.iname) for i in self.outputs]),
+        "".join(["  wire [%s:0] %s;\n"%(i.bits-1, i.name) for i in self.streams]),
+        "\n",
+        "".join([i.generate()+"\n" for i in self.streams+self.outputs]),
+        "endmodule\n"])
+
+
+class Stream:
+    """A stream is a base class from which other expression classes are
+    derived, all streams have a name, bits and constant property"""
+
+    def __init__(self, bits, offset):
+        """This constructor will usually be called by a derived object class"""
+
+        global component
+        self.name, self.bits, self.offset = "s_"+str(component.sn), bits, offset
+        component.sn += 1
+        component.streams.append(self)
+        self.constant = False
+
+    def __add__(self, other):
+        return add(self, other)
+    def __sub__(self, other):
+        return sub(self, other)
+    def __mul__(self, other):
+        return mul(self, other)
+    def __gt__(self, other):
+        return gt(self, other)
+    def __ge__(self, other):
+        return ge(self, other)
+    def __lt__(self, other):
+        return lt(self, other)
+    def __le__(self, other):
+        return le(self, other)
+    def __eq__(self, other):
+        return eq(self, other)
+    def __ne__(self, other):
+        return ne(self, other)
+    def __lshift__(self, other):
+        return sl(self, other)
+    def __rshift__(self, other):
+        return sr(self, other)
+    def __and__(self, other):
+        return band(self, other)
+    def __or__(self, other):
+        return bor(self, other)
+    def __xor__(self, other):
+        return bxor(self, other)
+
+class Input(Stream):
+    """An input to the component."""
+
+    def __init__(self, bits, iname):
+        """add an output to component
+        arguments:
+            bits, the width of the input in bits
+            iname, the name of the input"""
+        global component
+        Stream.__init__(self, bits, 0)
+        self.iname = iname
+        component.inputs.append(self)
+
+    def generate(self):
+        return "  assign %s = %s;"%(self.name, self.iname)
+
+class Output:
+    """An output of the component."""
+    """An output of the component."""
+
+    def __init__(self, oname, stream):
+        """add an output to component
+        arguments:
+            iname, the name of the input
+            stream, the expression to be output"""
+        global component
+        stream = const(stream)
+        self.iname, self.bits, self.stream = oname, stream.bits, stream
+        component.outputs.append(self)
+
+    def generate(self):
+        return "  assign %s = %s;"%(self.iname, self.stream.name)
+
+def const(i):
+    if isinstance(i, Stream):
+        return i
+
+    if i > 0:
+        bits = int(ceil(log(i+1, 2)))
+    elif i<0:
+        bits = int(ceil(log(abs(i), 2)))+1
+    else:
+        bits = 1
+
+    return Constant(bits, int(i))
+
+class Constant(Stream):
+    """A constant value"""
+
+    def __init__(self, bits, value):
+        """a constant value
+        arguments:
+            bits - the width of the constant in bits
+            value - the value of the constant (must be convertible to an int)"""
+        Stream.__init__(self, bits, 0)
+        self.value = int(value)
+        self.constant = True
+
+    def generate(self):
+        return "  assign %s = %s'd%s;"%(self.name, self.bits, self.value) 
+
+class Register(Stream):
+    """A register.
+    Balancing registers will be placed on other paths, so a register
+    has the effect of breaking a timing path, and increasing latency
+    without changing the meaning of an expression."""
+    def __init__(self, i, delay = 1):
+        """a register
+        arguments:
+            bits - the width of the constant in bits
+            delay=1 - the number of clock cycles latency"""
+        global component
+        i = const(i)
+        Stream.__init__(self, i.bits, i.offset+delay)
+        self.i, self.delay = i, delay
+
+    def generate(self):
+        return "  dq #(%s, %s) dq_%s (clk, %s, %s);"%(
+            self.bits, int(self.delay), self.name, self.name, self.i.name)
+
+class Combinational(Stream):
+    """A combinational logic expression
+
+    This class serves as template for logic expressions, the following
+    templates are defined:
+
+    add, sub, mul, gt, ge, lt, le, eq, ne, band, bor, bxor, bnot, select,
+    index, getbits, getbit, cat"""
+    def __init__(self, inputs, bits, code):
+        """a combinational logic template
+        arguments:
+            inputs - a list of inputs
+            bits - width of expression in bits
+            code - code template"""
+        inputs = [const(i) for i in inputs]
+        Stream.__init__(self, bits, max([i.offset for i in inputs]))
+        delays = [(not i.constant) and self.offset - i.offset for i in inputs]
+        self.code = code
+        self.inputs = [(Register(i, int(d)) if d else i) for i, d in zip(inputs, delays)]
+
+    def generate(self):
+        return "".join(self.code.format(*([self.name] + [i.name for i in self.inputs])))
+
+def add(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = {1} + {2};")
+def sub(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = {1} - {2};")
+def mul(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = {1} * {2};")
+def sr(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = {1} >> {2};")
+def sl(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = {1} << {2};")
+def gt(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], 1, '  assign {0} = {1} > {2};')
+def ge(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], 1, '  assign {0} = {1} >= {2};')
+def lt(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], 1, '  assign {0} = {1} < {2};')
+def le(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], 1, '  assign {0} = {1} <= {2};')
+def s_mul(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = $signed({1}) * $signed({2});")
+def s_sr(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = $signed({1}) >> $signed({2});")
+def s_sl(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = $signed({1}) << $signed({2});")
+def s_gt(x, y):
+    return Combinational([x, y], 1, '  assign {0} = $signed({1}) > $signed({2});')
+def s_ge(x, y):
+    return Combinational([x, y], 1, '  assign {0} = $signed({1}) >= $signed({2});')
+def s_lt(x, y):
+    return Combinational([x, y], 1, '  assign {0} = $signed({1}) < $signed({2});')
+def s_le(x, y):
+    return Combinational([x, y], 1, '  assign {0} = $signed({1}) <= $signed({2});')
+def eq(x, y):
+    return Combinational([x, y], 1, '  assign {0} = {1} = {2};')
+def ne(x, y):
+    return Combinational([x, y], 1, '  assign {0} = {1} /= {2};')
+def band(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max(x.bits, y.bits), '  assign {0} = {1} & {2};')
+def bor(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max(x.bits, y.bits), '  assign {0} = {1} | {2};')
+def bxor(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], max(x.bits, y.bits), '  assign {0} = {1} ^ {2};')
+def invert(x):
+    x = const(x)
+    return Combinational([x], x.bits, "  assign {0} = ~{1};")
+def negate(x):
+    x = const(x)
+    return Combinational([x], x.bits, "  assign {0} = -{1};")
+def select(x, y, z):
+    x, y = const(x), const(y)
+    return Combinational([x, y, z], max(x.bits, y.bits), "  assign {0} = {3}?{1}:{2};")
+def index(x, y):
+    return Combinational([x, y], 1, "  assign {0} = {1}[{2}];")
+def getbits(x, y, z):
+    return Combinational([x], y-z, "  assign {0} = {1}[%s:%s];"%(int(y), int(z)))
+def getbit(x, y):
+    return Combinational([x], 1, "  assign {0} = {1}[%s];"%int(y))
+def setbits(x, y, z):
+    x = const(x)
+    return Combinational([x], x.bits, "  assign {0} = {{{0}[%s:%s],{1},{0}[%s:%s]}}};"%(x.bits-1, int(y)+1, int(z)-1, 0))
+def setbit(x, y):
+    return Combinational([x], 1, "  assign {0} = {{{0}[%s:%s],{1},{0}[%s:%s]}};"%(x.bits-1, int(y)+1, int(y)-1, 0))
+def resize(x, y):
+    return Combinational([x], y, "  assign {0} = {1};")
+def s_resize(x, y):
+    return Combinational([x], y, "  assign {0} = $signed({1});")
+def cat(x, y):
+    x, y = const(x), const(y)
+    return Combinational([x, y], x.bits+y.bits, "  assign {0} = {{{1},{2}}};")
+
+def test(component, stimulus):
+    latency = max([i.stream.offset for i in component.outputs])
+    stimulus_length = max([len(i) for i in stimulus.values()])
+    stop_clocks = stimulus_length + latency + 1
+
+    for n, s in stimulus.iteritems():
+        f = open(n, 'w')
+        f.write("".join(["%d\n"%i for i in s]))
+        f.close()
+
+    testbench = "".join([
+    "module uut_tb;\n",
+    "  reg clk;\n",
+    "".join(["  reg [%s:0] %s;\n"%(i.bits-1, i.iname) for i in component.inputs]),
+    "".join(["  wire [%s:0] %s;\n"%(i.bits-1, i.iname) for i in component.outputs]),
+    "".join(["  integer %s_file;\n"%(i.iname) for i in component.inputs]),
+    "".join(["  integer %s_file;\n"%(i.iname) for i in component.outputs]),
+    "".join(["  integer %s_count;\n"%(i.iname) for i in component.inputs]),
+    "".join(["  integer %s_count;\n"%(i.iname) for i in component.outputs]),
+    "\n",
+    "  uut uut1 (clk, %s);\n"%(", ".join([i.iname for i in component.inputs+component.outputs])),
+    "  initial\n",
+    "  begin\n",
+    '    $dumpfile("test.vcd");\n',
+    '    $dumpvars(0,uut_tb);\n',
+    "".join(['    %s_file = $fopen("%s");\n'%(i.iname, i.iname) for i in component.outputs]),
+    "".join(['    %s_file = $fopenr("%s");\n'%(i.iname, i.iname) for i in component.inputs]),
+    "  end\n\n",
+    "  initial\n",
+    "  begin\n",
+    "    #%s $finish;\n" % (10 * stop_clocks),
+    "  end\n\n",
+    "  initial\n",
+    "  begin\n",
+    "    clk <= 1'b0;\n",
+    "    while (1) begin\n",
+    "      #5 clk <= ~clk;\n",
+    "    end\n",
+    "  end\n\n",
+    "  always @ (posedge clk)\n",
+    "  begin\n",
+    "".join(['    $fdisplay(%s_file, "%%d", %s);\n'%(i.iname, i.iname) for i in component.outputs]),
+    "".join(['    #0 %s_count = $fscanf(%s_file, "%%d\\n", %s);\n'%(i.iname, i.iname, i.iname) for i in component.inputs]),
+    "  end\n",
+    "endmodule\n"])
+
+    f = open("uut.v", 'w')
+    f.write(component.generate())
+    f.close()
+
+    f = open("uut_tb.v", 'w')
+    f.write(testbench)
+    f.close()
+
+    subprocess.call(["iverilog", "-o", "uut_tb", "uut.v", "uut_tb.v"])
+    subprocess.call(["vvp", "uut_tb"])
+
+    response = {}
+    for i in component.outputs:
+        f = open(i.iname)
+        response[i.iname] = [int(j) for j in list(f)[1+latency:]]
+        f.close()
+    return response
+
+component = Component()
+
+if __name__ == "__main__":
+    a = Input(8, 'a')
+    b = Input(8, 'b')
+    c = Input(8, 'c')
+    Output("z", Register(Register(a, 10)+b)+c)
+    print test(component, {'a':range(10), 'b':range(10), 'c':range(10)})
