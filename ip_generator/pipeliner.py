@@ -15,7 +15,8 @@ class Component:
 
         #align outputs
         max_offset = max([i.stream.offset for i in self.outputs])
-        delays = [(not i.stream.constant) and max_offset - i.stream.offset for i in self.outputs]
+        delays = [(not i.stream.constant) and 
+                max_offset - i.stream.offset for i in self.outputs]
         for i, d in zip(self.outputs, delays):
             if d:
                 i.stream = Register(i.stream, d)
@@ -41,12 +42,87 @@ class Component:
         ", ".join(["%s"%i.iname for i in self.inputs+self.outputs]),
         ");\n",
         "  input clk;\n",
-        "".join(["  input [%s:0] %s;\n"%(i.bits-1, i.iname) for i in self.inputs]),
-        "".join(["  output [%s:0] %s;\n"%(i.bits-1, i.iname) for i in self.outputs]),
-        "".join(["  wire [%s:0] %s;\n"%(i.bits-1, i.name) for i in self.streams]),
+        "".join(["  input [%s:0] %s;\n"%(i.bits-1, i.iname) 
+            for i in self.inputs]),
+        "".join(["  output [%s:0] %s;\n"%(i.bits-1, i.iname) 
+            for i in self.outputs]),
+        "".join(["  wire [%s:0] %s;\n"%(i.bits-1, i.name) 
+            for i in self.streams]),
         "\n",
         "".join([i.generate()+"\n" for i in self.streams+self.outputs]),
         "endmodule\n"])
+
+    def test(self, stimulus):
+        latency = max([i.stream.offset for i in self.outputs])
+        stimulus_length = max([len(i) for i in stimulus.values()])
+        stop_clocks = stimulus_length + latency + 1
+
+        for n, s in stimulus.iteritems():
+            f = open(n, 'w')
+            f.write("".join(["%d\n"%i for i in s]))
+            f.close()
+
+        testbench = "".join([
+        "module uut_tb;\n",
+        "  reg clk;\n",
+        "".join(["  reg [%s:0] %s;\n"%(i.bits-1, i.iname) 
+            for i in self.inputs]),
+        "".join(["  wire [%s:0] %s;\n"%(i.bits-1, i.iname) 
+            for i in self.outputs]),
+        "".join(["  integer %s_file;\n"%(i.iname) for i in self.inputs]),
+        "".join(["  integer %s_file;\n"%(i.iname) for i in self.outputs]),
+        "".join(["  integer %s_count;\n"%(i.iname) for i in self.inputs]),
+        "".join(["  integer %s_count;\n"%(i.iname) for i in self.outputs]),
+        "\n",
+        "  uut uut1 (clk, %s);\n"%(", ".join([i.iname 
+            for i in self.inputs+self.outputs])),
+        "  initial\n",
+        "  begin\n",
+        #'    $dumpfile("test.vcd");\n',
+        #'    $dumpvars(0,uut_tb);\n',
+        "".join(['    %s_file = $fopen("%s");\n'%(i.iname, i.iname) 
+            for i in self.outputs]),
+        "".join(['    %s_file = $fopenr("%s");\n'%(i.iname, i.iname) 
+            for i in self.inputs]),
+        "  end\n\n",
+        "  initial\n",
+        "  begin\n",
+        "    #%s $finish;\n" % (10 * stop_clocks),
+        "  end\n\n",
+        "  initial\n",
+        "  begin\n",
+        "    clk <= 1'b0;\n",
+        "    while (1) begin\n",
+        "      #5 clk <= ~clk;\n",
+        "    end\n",
+        "  end\n\n",
+        "  always @ (posedge clk)\n",
+        "  begin\n",
+        "".join(['    $fdisplay(%s_file, "%%d", %s);\n'%(i.iname, i.iname) 
+            for i in self.outputs]),
+        "".join([
+            '    #0 %s_count = $fscanf(%s_file, "%%d\\n", %s);\n'%(
+                i.iname, i.iname, i.iname) for i in self.inputs]),
+        "  end\n",
+        "endmodule\n"])
+
+        f = open("uut.v", 'w')
+        f.write(self.generate())
+        f.close()
+
+        f = open("uut_tb.v", 'w')
+        f.write(testbench)
+        f.close()
+
+        subprocess.call(["iverilog", "-o", "uut_tb", "uut.v", "uut_tb.v"])
+        subprocess.call(["vvp", "uut_tb"])
+
+        response = {}
+        for i in self.outputs:
+            f = open(i.iname)
+            response[i.iname] = [int(j) for j in list(f)[1+latency:]]
+            f.close()
+        return response
 
 
 class Stream:
@@ -90,6 +166,22 @@ class Stream:
         return bor(self, other)
     def __xor__(self, other):
         return bxor(self, other)
+    def __abs__(self):
+        return select(self, -self, self>=0)
+    def __neg__(self):
+        return negate(self)
+    def __invert__(self):
+        return invert(self)
+    def __getitem__(self, other):
+        try:
+            return getbit(self, int(other))
+        except TypeError:
+            return getbits(self, other.start, other.stop)
+    def __floordiv__(self, other):
+        return divide(self, other)[0]
+    def __mod__(self, other):
+        return divide(self, other)[1]
+
 
 class Input(Stream):
     """An input to the component."""
@@ -108,7 +200,6 @@ class Input(Stream):
         return "  assign %s = %s;"%(self.name, self.iname)
 
 class Output:
-    """An output of the component."""
     """An output of the component."""
 
     def __init__(self, oname, stream):
@@ -150,7 +241,10 @@ class Constant(Stream):
         self.constant = True
 
     def generate(self):
-        return "  assign %s = %s'd%s;"%(self.name, self.bits, self.value) 
+        if self.value >= 0:
+            return "  assign %s = %s'd%s;"%(self.name, self.bits, self.value) 
+        else:
+            return "  assign %s = -%s'd%s;"%(self.name, self.bits, -self.value) 
 
 class Register(Stream):
     """A register.
@@ -189,26 +283,33 @@ class Combinational(Stream):
         Stream.__init__(self, bits, max([i.offset for i in inputs]))
         delays = [(not i.constant) and self.offset - i.offset for i in inputs]
         self.code = code
-        self.inputs = [(Register(i, int(d)) if d else i) for i, d in zip(inputs, delays)]
+        self.inputs = [(Register(i, int(d)) if d else i) 
+                for i, d in zip(inputs, delays)]
 
     def generate(self):
-        return "".join(self.code.format(*([self.name] + [i.name for i in self.inputs])))
+        return "".join(self.code.format(*([self.name] + [i.name 
+            for i in self.inputs])))
 
 def add(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = {1} + {2};")
+    return Combinational([x, y], max([x.bits, y.bits]), 
+            "  assign {0} = {1} + {2};")
 def sub(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = {1} - {2};")
+    return Combinational([x, y], max([x.bits, y.bits]), 
+            "  assign {0} = {1} - {2};")
 def mul(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = {1} * {2};")
+    return Combinational([x, y], max([x.bits, y.bits]), 
+            "  assign {0} = {1} * {2};")
 def sr(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = {1} >> {2};")
+    return Combinational([x, y], max([x.bits, y.bits]), 
+            "  assign {0} = {1} >> {2};")
 def sl(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = {1} << {2};")
+    return Combinational([x, y], max([x.bits, y.bits]), 
+            "  assign {0} = {1} << {2};")
 def gt(x, y):
     x, y = const(x), const(y)
     return Combinational([x, y], 1, '  assign {0} = {1} > {2};')
@@ -223,34 +324,44 @@ def le(x, y):
     return Combinational([x, y], 1, '  assign {0} = {1} <= {2};')
 def s_mul(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = $signed({1}) * $signed({2});")
+    return Combinational([x, y], max([x.bits, y.bits]), 
+            "  assign {0} = $signed({1}) * $signed({2});")
 def s_sr(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = $signed({1}) >> $signed({2});")
+    return Combinational([x, y], max([x.bits, y.bits]), 
+            "  assign {0} = $signed({1}) >> $signed({2});")
 def s_sl(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max([x.bits, y.bits]), "  assign {0} = $signed({1}) << $signed({2});")
+    return Combinational([x, y], max([x.bits, y.bits]), 
+            "  assign {0} = $signed({1}) << $signed({2});")
 def s_gt(x, y):
-    return Combinational([x, y], 1, '  assign {0} = $signed({1}) > $signed({2});')
+    return Combinational([x, y], 1, 
+            '  assign {0} = $signed({1}) > $signed({2});')
 def s_ge(x, y):
-    return Combinational([x, y], 1, '  assign {0} = $signed({1}) >= $signed({2});')
+    return Combinational([x, y], 1, 
+            '  assign {0} = $signed({1}) >= $signed({2});')
 def s_lt(x, y):
-    return Combinational([x, y], 1, '  assign {0} = $signed({1}) < $signed({2});')
+    return Combinational([x, y], 1, 
+            '  assign {0} = $signed({1}) < $signed({2});')
 def s_le(x, y):
-    return Combinational([x, y], 1, '  assign {0} = $signed({1}) <= $signed({2});')
+    return Combinational([x, y], 1, 
+            '  assign {0} = $signed({1}) <= $signed({2});')
 def eq(x, y):
-    return Combinational([x, y], 1, '  assign {0} = {1} = {2};')
+    return Combinational([x, y], 1, '  assign {0} = {1} == {2};')
 def ne(x, y):
-    return Combinational([x, y], 1, '  assign {0} = {1} /= {2};')
+    return Combinational([x, y], 1, '  assign {0} = {1} != {2};')
 def band(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max(x.bits, y.bits), '  assign {0} = {1} & {2};')
+    return Combinational([x, y], max(x.bits, y.bits), 
+            '  assign {0} = {1} & {2};')
 def bor(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max(x.bits, y.bits), '  assign {0} = {1} | {2};')
+    return Combinational([x, y], max(x.bits, y.bits), 
+            '  assign {0} = {1} | {2};')
 def bxor(x, y):
     x, y = const(x), const(y)
-    return Combinational([x, y], max(x.bits, y.bits), '  assign {0} = {1} ^ {2};')
+    return Combinational([x, y], max(x.bits, y.bits), 
+            '  assign {0} = {1} ^ {2};')
 def invert(x):
     x = const(x)
     return Combinational([x], x.bits, "  assign {0} = ~{1};")
@@ -259,89 +370,57 @@ def negate(x):
     return Combinational([x], x.bits, "  assign {0} = -{1};")
 def select(x, y, z):
     x, y = const(x), const(y)
-    return Combinational([x, y, z], max(x.bits, y.bits), "  assign {0} = {3}?{1}:{2};")
+    return Combinational([x, y, z], max(x.bits, y.bits), 
+            "  assign {0} = {3}?{1}:{2};")
 def index(x, y):
     return Combinational([x, y], 1, "  assign {0} = {1}[{2}];")
 def getbits(x, y, z):
-    return Combinational([x], y-z, "  assign {0} = {1}[%s:%s];"%(int(y), int(z)))
+    return Combinational([x], y-z+1, 
+            "  assign {0} = {1}[%s:%s];"%(int(y), int(z)))
 def getbit(x, y):
     return Combinational([x], 1, "  assign {0} = {1}[%s];"%int(y))
 def setbits(x, y, z):
     x = const(x)
-    return Combinational([x], x.bits, "  assign {0} = {{{0}[%s:%s],{1},{0}[%s:%s]}}};"%(x.bits-1, int(y)+1, int(z)-1, 0))
+    return Combinational([x], x.bits, 
+            "  assign {0} = {{{0}[%s:%s],{1},{0}[%s:%s]}}};"%(
+                x.bits-1, int(y)+1, int(z)-1, 0))
 def setbit(x, y):
-    return Combinational([x], 1, "  assign {0} = {{{0}[%s:%s],{1},{0}[%s:%s]}};"%(x.bits-1, int(y)+1, int(y)-1, 0))
+    return Combinational([x], 1, 
+            "  assign {0} = {{{0}[%s:%s],{1},{0}[%s:%s]}};"%(
+                x.bits-1, int(y)+1, int(y)-1, 0))
 def resize(x, y):
-    return Combinational([x], y, "  assign {0} = {1};")
+    return Combinational([x], y, 
+            "  assign {0} = {1};")
 def s_resize(x, y):
     return Combinational([x], y, "  assign {0} = $signed({1});")
 def cat(x, y):
     x, y = const(x), const(y)
     return Combinational([x, y], x.bits+y.bits, "  assign {0} = {{{1},{2}}};")
+def divide(dividend, divisor):
+    bits = max([dividend.bits, divisor.bits])
+    remainder = Constant(bits, 0)
+    quotient = Constant(bits, 0)
+    for i in range(bits):
+        shifter = remainder << 1 | dividend[bits-1-i]
+        difference = resize(shifter, bits+1) - divisor
+        negative = difference[bits]
+        remainder = select(shifter, difference, negative)
+        quotient = quotient << 1
+        quotient = select(quotient, quotient | 1, negative)
+        quotient = Register(quotient)
+        remainder = Register(remainder)
 
-def test(component, stimulus):
-    latency = max([i.stream.offset for i in component.outputs])
-    stimulus_length = max([len(i) for i in stimulus.values()])
-    stop_clocks = stimulus_length + latency + 1
+    return quotient, remainder
 
-    for n, s in stimulus.iteritems():
-        f = open(n, 'w')
-        f.write("".join(["%d\n"%i for i in s]))
-        f.close()
+def s_divide(dividend, divisor):
+    divisor_sign = divisor[divisor.bits-1]
+    dividend_sign = dividend[dividend.bits-1]
+    sign = dividend_sign, divisor_sign
+    quotient, remainder = divide(abs(dividend), abs(divisor))
+    quotient = select(-quotient, quotient, sign)
+    remainder = select(-remainder, remainder, dividend_sign)
+    return quotient, remainder
 
-    testbench = "".join([
-    "module uut_tb;\n",
-    "  reg clk;\n",
-    "".join(["  reg [%s:0] %s;\n"%(i.bits-1, i.iname) for i in component.inputs]),
-    "".join(["  wire [%s:0] %s;\n"%(i.bits-1, i.iname) for i in component.outputs]),
-    "".join(["  integer %s_file;\n"%(i.iname) for i in component.inputs]),
-    "".join(["  integer %s_file;\n"%(i.iname) for i in component.outputs]),
-    "".join(["  integer %s_count;\n"%(i.iname) for i in component.inputs]),
-    "".join(["  integer %s_count;\n"%(i.iname) for i in component.outputs]),
-    "\n",
-    "  uut uut1 (clk, %s);\n"%(", ".join([i.iname for i in component.inputs+component.outputs])),
-    "  initial\n",
-    "  begin\n",
-    '    $dumpfile("test.vcd");\n',
-    '    $dumpvars(0,uut_tb);\n',
-    "".join(['    %s_file = $fopen("%s");\n'%(i.iname, i.iname) for i in component.outputs]),
-    "".join(['    %s_file = $fopenr("%s");\n'%(i.iname, i.iname) for i in component.inputs]),
-    "  end\n\n",
-    "  initial\n",
-    "  begin\n",
-    "    #%s $finish;\n" % (10 * stop_clocks),
-    "  end\n\n",
-    "  initial\n",
-    "  begin\n",
-    "    clk <= 1'b0;\n",
-    "    while (1) begin\n",
-    "      #5 clk <= ~clk;\n",
-    "    end\n",
-    "  end\n\n",
-    "  always @ (posedge clk)\n",
-    "  begin\n",
-    "".join(['    $fdisplay(%s_file, "%%d", %s);\n'%(i.iname, i.iname) for i in component.outputs]),
-    "".join(['    #0 %s_count = $fscanf(%s_file, "%%d\\n", %s);\n'%(i.iname, i.iname, i.iname) for i in component.inputs]),
-    "  end\n",
-    "endmodule\n"])
-
-    f = open("uut.v", 'w')
-    f.write(component.generate())
-    f.close()
-
-    f = open("uut_tb.v", 'w')
-    f.write(testbench)
-    f.close()
-
-    subprocess.call(["iverilog", "-o", "uut_tb", "uut.v", "uut_tb.v"])
-    subprocess.call(["vvp", "uut_tb"])
-
-    response = {}
-    for i in component.outputs:
-        f = open(i.iname)
-        response[i.iname] = [int(j) for j in list(f)[1+latency:]]
-        f.close()
-    return response
 
 component = Component()
 
