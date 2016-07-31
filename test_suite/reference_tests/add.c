@@ -14,7 +14,7 @@ void main(){
 
     infa = fopen("a", "r");
     infb = fopen("b", "r");
-    outf = fopen("z_expected", "w");
+    outf = fopen("stim/z_expected", "w");
 
     while(1){
         if(fscanf(infa, "%u", &a) == EOF) break;

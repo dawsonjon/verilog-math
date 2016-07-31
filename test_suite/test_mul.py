@@ -18,7 +18,7 @@ from random import randint
 
 def get_expected():
     subprocess.call("./reference_tests/mul")
-    inf = open("z_expected")
+    inf = open("stim/z_expected")
     return [int(i) for i in inf]
 
 def test_function(a, b):
