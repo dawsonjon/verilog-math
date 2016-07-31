@@ -78,8 +78,8 @@ class Component:
             for i in self.inputs+self.outputs])),
         "  initial\n",
         "  begin\n",
-        #'    $dumpfile("test.vcd");\n',
-        #'    $dumpvars(0,uut_tb);\n',
+        '    $dumpfile("test.vcd");\n',
+        '    $dumpvars(0,uut_tb);\n',
         "".join(['    %s_file = $fopen("%s");\n'%(i.iname, i.iname) 
             for i in self.outputs]),
         "".join(['    %s_file = $fopenr("%s");\n'%(i.iname, i.iname) 

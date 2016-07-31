@@ -20,10 +20,10 @@ class Float:
     def __mul__(self, other):
 
         #add a bit to e so that we can test for overflow
-        a_e = s_resize(a.e, self.e_bits+1)
-        b_e = s_resize(b.e, self.e_bits+1)
-        a_m = resize(a.m, self.m_bits*2)
-        b_m = resize(b.m, self.m_bits*2)
+        a_e = s_resize(self.e, self.e_bits+1)
+        b_e = s_resize(other.e, self.e_bits+1)
+        a_m = resize(self.m, self.m_bits*2)
+        b_m = resize(other.m, self.m_bits*2)
         a_s = self.s
         b_s = other.s
         a_inf = self.inf
@@ -31,21 +31,50 @@ class Float:
         a_nan = self.nan
         b_nan = other.nan
 
+        test_probe(a_e, "a_e")
+        test_probe(b_e, "b_e")
+        test_probe(a_m, "a_m")
+        test_probe(b_m, "b_m")
+        test_probe(a_s, "a_s")
+        test_probe(b_s, "b_s")
+
         z_s = a_s ^ b_s
         z_e = a_e + b_e + 1
         z_m = a_m * b_m
+        
+        #handle underflow
+        shift_amount = Constant(z_e.bits, self.e_min) - z_e
+        shift_amount = select(shift_amount, 0, s_gt(shift_amount, 0))
+        z_m >>= shift_amount
+        z_e += shift_amount
 
-        z_m, z_e, normalise(z_m, z_e, self.e_min)
-        z_m = z_m[self.m_bits*2-1:self.m_bits]
+        test_probe(z_m, "z_m")
+        test_probe(z_e, "z_e")
+
+        z_m, z_e = normalise(z_m, z_e, self.e_min)
+
+        test_probe(z_m, "z_m")
+        test_probe(z_e, "z_e")
+
         g = z_m[self.m_bits-1]
         r = z_m[self.m_bits-2]
         s = z_m[self.m_bits-3:0] != Constant(self.m_bits, 0)
+        z_m = z_m[self.m_bits*2-1:self.m_bits]
+        test_probe(z_m, "z_m")
         z_m, z_e = fpround(z_m, z_e, g, r, s)
+        test_probe(z_m, "z_m")
+        test_probe(z_e, "z_e")
+        test_probe(z_s, "z_s")
+        test_probe(Constant(self.e_bits, self.e_max), "e_max")
 
-        overflow = z_e[self.e_bits]
+        overflow = s_gt(z_e, Constant(self.e_bits+1, self.e_max))
         z_e = z_e[self.e_bits-1:0]
         z_inf = overflow | a_inf | b_inf
         z_nan = a_nan | b_nan
+
+        test_probe(overflow, "overflow")
+        test_probe(z_inf, "z_inf")
+        test_probe(z_nan, "z_nan")
 
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
 
@@ -196,16 +225,18 @@ def float_to_single(f):
     result = select(denormal_result, result, denormal)
 
     #zeros
-    zero = Constant(32, 0)
+    zero = cat(f.s, Constant(31, 0))
     result = select(zero, result, f.m==Constant(24, 0))
 
     #infs
     inf = cat(f.s, Constant(31, 0x7f800000))
     result = select(inf, result, f.inf)
 
+
     #nans
     nan = cat(f.s, Constant(31, 0x7fc00000))
     result = select(nan, result, f.nan)
+    test_probe(result, "result")
 
     return result
     
@@ -218,9 +249,13 @@ def normalise(m, e, e_min):
     lz = leading_zeros(m)
     max_shift = e - Constant(e.bits, e_min)
 
-    shift_amount = select(lz, max_shift, lz <= max_shift)
+    shift_amount = select(lz, max_shift, resize(lz, e.bits) <= max_shift)
+    test_probe(shift_amount, "shift_amount")
+    test_probe(m, "m")
     m = m << shift_amount
+    test_probe(e, "e")
     e = e - shift_amount
+    test_probe(e, "e")
 
     return m, e
 

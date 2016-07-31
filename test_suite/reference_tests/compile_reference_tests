@@ -1,2 +1,3 @@
 #!/bin/sh
 gcc -o add add.c
+gcc -o mul mul.c
