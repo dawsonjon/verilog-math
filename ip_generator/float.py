@@ -20,8 +20,8 @@ class Float:
     def __mul__(self, other):
 
         #add a bit to e so that we can test for overflow
-        a_e = s_resize(self.e, self.e_bits+1)
-        b_e = s_resize(other.e, self.e_bits+1)
+        a_e = s_resize(self.e, self.e_bits+2)
+        b_e = s_resize(other.e, self.e_bits+2)
         a_m = resize(self.m, self.m_bits*2)
         b_m = resize(other.m, self.m_bits*2)
         a_s = self.s
@@ -41,10 +41,14 @@ class Float:
         z_s = a_s ^ b_s
         z_e = a_e + b_e + 1
         z_m = a_m * b_m
+        test_probe(z_m, "z_m")
+        test_probe(z_e, "z_e")
         
         #handle underflow
         shift_amount = Constant(z_e.bits, self.e_min) - z_e
-        shift_amount = select(shift_amount, 0, s_gt(shift_amount, 0))
+        test_probe(shift_amount, "shift_amount")
+        shift_amount = select(0, shift_amount, shift_amount[z_e.bits-1])
+        test_probe(shift_amount, "shift_amount")
         z_m >>= shift_amount
         z_e += shift_amount
 

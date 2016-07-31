@@ -1,0 +1,5 @@
+uut.v
+uut_tb
+uut_tb.v
+z_expected
+test.vcd

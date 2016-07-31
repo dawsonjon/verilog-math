@@ -58,7 +58,7 @@ class Component:
         stop_clocks = stimulus_length + latency + 1
 
         for n, s in stimulus.iteritems():
-            f = open(n, 'w')
+            f = open("stim/"+n, 'w')
             f.write("".join(["%d\n"%i for i in s]))
             f.close()
 
@@ -80,9 +80,9 @@ class Component:
         "  begin\n",
         '    $dumpfile("test.vcd");\n',
         '    $dumpvars(0,uut_tb);\n',
-        "".join(['    %s_file = $fopen("%s");\n'%(i.iname, i.iname) 
+        "".join(['    %s_file = $fopen("stim/%s");\n'%(i.iname, i.iname) 
             for i in self.outputs]),
-        "".join(['    %s_file = $fopenr("%s");\n'%(i.iname, i.iname) 
+        "".join(['    %s_file = $fopenr("stim/%s");\n'%(i.iname, i.iname) 
             for i in self.inputs]),
         "  end\n\n",
         "  initial\n",
@@ -119,7 +119,7 @@ class Component:
 
         response = {}
         for i in self.outputs:
-            f = open(i.iname)
+            f = open("stim/"+i.iname)
             response[i.iname] = [int(j) for j in list(f)[1+latency:]]
             f.close()
         return response
