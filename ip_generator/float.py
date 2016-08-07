@@ -82,15 +82,14 @@ class Float:
         a_nan = self.nan
         b_nan = other.nan
 
-
         z_s = a_s ^ b_s
         z_e = a_e + b_e + 1
-        z_m = a_m * b_m
+        z_m = pipelined_mul(a_m, b_m, 18)
         
         #handle underflow
         shift_amount = Constant(z_e.bits, self.e_min) - z_e
         shift_amount = select(0, shift_amount, shift_amount[z_e.bits-1])
-        z_m >>= shift_amount
+        z_m = pipelined_rshift(z_m, shift_amount, 4)
         z_e += shift_amount
 
         z_m, z_e = normalise(z_m, z_e, self.e_min)
@@ -137,27 +136,11 @@ class Float:
         #increase exponent of smaller operand to match larger operand
         difference = larger_e - smaller_e
         mask = Constant(smaller_m.bits, smaller_m.bits) - difference
-
-        #pipeline stage 1
-        larger_m  = Register(larger_m)
-        larger_e  = Register(larger_e)
-        larger_s  = Register(larger_s)
-        smaller_m = Register(smaller_m)
-        smaller_e = Register(smaller_e)
-        smaller_s = Register(smaller_s)
-        difference = Register(difference)
-        mask = Register(mask)
-
-        smaller_e = smaller_e + difference
-        sticky = smaller_m << mask
-        smaller_m = smaller_m >> difference
+        smaller_e = pipelined_add(smaller_e, difference, 18)
+        sticky = pipelined_lshift(smaller_m, mask, 4)
+        smaller_m = pipelined_rshift(smaller_m, difference, 4)
         sticky = sticky != 0
         smaller_m |= sticky
-
-        #pipeline stage 2
-        smaller_m = Register(smaller_m)
-        smaller_e = Register(smaller_e)
-        sticky = Register(sticky)
 
         #swap operands so that larger contains the operand with larger mantissa
         a_ge_b    = larger_m >= smaller_m
@@ -171,58 +154,35 @@ class Float:
         larger_e  = larger_e_1
         larger_s  = larger_s_1
 
-        #pipeline stage 3
-        larger_m  = Register(larger_m)
-        larger_e  = Register(larger_e)
-        larger_s  = Register(larger_s)
-        smaller_m = Register(smaller_m)
-        smaller_e = Register(smaller_e)
-        smaller_s = Register(smaller_s)
-
+        #if the signs differ perform a subtraction instead
         add_sub = a_s == b_s
-        smaller_m = select(smaller_m, -smaller_m, add_sub)
+        negative_smaller_m = pipelined_sub(Constant(smaller_m.bits, 0), smaller_m, 18)
+        smaller_m = select(smaller_m, negative_smaller_m, add_sub)
 
-
-        #pipeline stage 4
-        smaller_m = Register(smaller_m)
-
-        z_m = larger_m + smaller_m
-        z_s = select(0, larger_s, z_m == 0)
+        #perform the addition
         #Add one to the exponent, assuming that mantissa overflow
         #has occurred. If it hasn't the msb of the result will be zero
         #and the exponent will be reduced again accordingly.
+        z_m = pipelined_add(larger_m, smaller_m, 18)
+        z_s = select(0, larger_s, z_m == 0)
         z_e = larger_e + 1 
 
-        #pipeline stage 5
-        z_m = Register(z_m)
-        z_e = Register(z_e)
-
+        #normalise the result
         z_m, z_e = normalise(z_m, z_e, self.e_min)
 
-        #pipeline stage 6
-        z_m = Register(z_m)
-        z_e = Register(z_e)
-
-
+        #perform rounding
         g = z_m[3]
         r = z_m[2]
         s = z_m[1] | z_m[0]
         z_m = z_m[self.m_bits+3:4]
         z_m, z_e = fpround(z_m, z_e, g, r, s)
 
-
+        #handle special cases
         overflow = s_gt(z_e, Constant(self.e_bits, self.e_max))
         z_e = z_e[self.e_bits-1:0]
         z_inf = overflow | a_inf | b_inf
         z_nan = a_nan | b_nan | (a_inf & b_inf)
-
         
-        z_s    = Register(z_s  )
-        z_e    = Register(z_e  )
-        z_m    = Register(z_m  )
-        z_inf  = Register(z_inf)
-        z_nan  = Register(z_nan)
-
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
 
 class FPConstant(Float):
@@ -280,15 +240,15 @@ def normalise(m, e, e_min):
     max_shift = e - Constant(e.bits, e_min)
 
     shift_amount = select(lz, max_shift, resize(lz, e.bits) <= max_shift)
-    m = m << shift_amount
-    e = e - shift_amount
+    m = pipelined_lshift(m, shift_amount, 4)
+    e = pipelined_sub(e, shift_amount, 18)
 
     return m, e
 
 def fpround(m, e, g, r, s):
 
     roundup = g & (r | s | m[0])
-    m = resize(m, m.bits+1) + roundup
+    m = pipelined_add(resize(m, m.bits+1), roundup, 18)
 
     #correct for overflow in rounding
     overflow = m[m.bits-1]
@@ -303,7 +263,13 @@ def leading_zeros(stream):
     return out
 
 def pipelined_add(a, b, width):
+
+    """Create a pipelined adder, width is the maximum number of bits
+    to add before a pipeline register is added"""
+
     bits = max([a.bits, b.bits])
+    a = resize(a, bits)
+    b = resize(b, bits)
     for lsb in range(0, bits, width):
         msb = min([lsb + width - 1, bits-1])
         a_part = a[msb:lsb]
@@ -316,10 +282,56 @@ def pipelined_add(a, b, width):
             z = part_sum[width-1:0]
         carry = part_sum[width]
         carry = Register(carry)
-    return z
+    return z[bits-1:0]
+
+def pipelined_mul(a, b, width):
+
+    """Create a pipelined multiplier, width is the maximum number of bits
+    to add before a pipeline register is added"""
+
+    bits = max([a.bits, b.bits])
+
+    num_parts = int(ceil(float(bits)/width))
+    a = resize(a, width * num_parts)
+    b = resize(b, width * num_parts)
+
+    a_parts = [a[lsb+width:lsb] for lsb in range(0, bits, width)]
+    b_parts = [b[lsb+width:lsb] for lsb in range(0, bits, width)]
+
+
+    #calculate partial products
+    partial_products = []
+    a_significance = 0
+    for a_part in a_parts:
+        b_significance = 0
+        for b_part in b_parts:
+            significance = a_significance + b_significance
+            if significance < bits:
+                partial_product = a_part * b_part
+                partial_product = resize(partial_product, width+significance)
+                partial_product <<= significance
+                partial_product = Register(partial_product)
+                partial_products.append(partial_product)
+            b_significance += width
+        a_significance += width
+
+    #sum partial products
+    while len(partial_products) > 1:
+        evens = partial_products[0::2]
+        odds = partial_products[1::2]
+        partial_products = [pipelined_add(i, j, width) for i, j in zip(evens, odds)]
+
+    return partial_products[0][bits-1:0]
+    
 
 def pipelined_sub(a, b, width):
+
+    """Create a pipelined subtractor, width is the maximum number of bits
+    to add before a pipeline register is added"""
+
     bits = max([a.bits, b.bits])
+    a = resize(a, bits)
+    b = resize(b, bits)
     for lsb in range(0, bits, width):
         msb = min([lsb + width - 1, bits-1])
         a_part = a[msb:lsb]
@@ -332,4 +344,51 @@ def pipelined_sub(a, b, width):
             z = part_sum[width-1:0]
         carry = ~part_sum[width]
         carry = Register(carry)
+    return z[bits-1:0]
+
+def pipelined_lshift(a, b, depth):
+
+    """Create a pipelined shifter, depth is the maximum number of 2-way
+    multiplexors needed before pipeline registers are needed"""
+
+    bits = max([a.bits, b.bits])
+    a = resize(a, bits)
+    b = resize(b, bits)
+
+    shift_amount = 1
+    z = a
+    depth_count = 0
+    for i in range(bits):
+        z = select(z<<shift_amount, z, b[i])
+        shift_amount *= 2
+        if depth_count == depth:
+            depth_count = 0
+            z = Register(z)
+        else:
+            depth_count += 1
+
+    return z
+    
+
+def pipelined_rshift(a, b, depth):
+
+    """Create a pipelined shifter, depth is the maximum number of 2-way
+    multiplexors needed before pipeline registers are needed"""
+
+    bits = max([a.bits, b.bits])
+    a = resize(a, bits)
+    b = resize(b, bits)
+
+    shift_amount = 1
+    z = a
+    depth_count = 0
+    for i in range(bits):
+        z = select(z>>shift_amount, z, b[i])
+        shift_amount *= 2
+        if depth_count == depth:
+            depth_count = 0
+            z = Register(z)
+        else:
+            depth_count += 1
+
     return z
