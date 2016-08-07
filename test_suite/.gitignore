@@ -1,5 +1,14 @@
 uut.v
 uut_tb
 uut_tb.v
+add.v
+add_tb
+add_tb.v
+mul.v
+mul_tb
+mul_tb.v
+div.v
+div_tb
+div_tb.v
 z_expected
 test.vcd

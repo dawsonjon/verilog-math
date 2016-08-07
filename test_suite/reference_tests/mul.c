@@ -12,9 +12,9 @@ void main(){
     unsigned int a;
     unsigned int b;
 
-    infa = fopen("stim/a", "r");
-    infb = fopen("stim/b", "r");
-    outf = fopen("stim/z_expected", "w");
+    infa = fopen("stim/mul_a", "r");
+    infb = fopen("stim/mul_b", "r");
+    outf = fopen("stim/mul_z_expected", "w");
 
     while(1){
         if(fscanf(infa, "%u", &a) == EOF) break;

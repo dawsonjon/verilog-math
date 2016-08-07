@@ -11,7 +11,7 @@ class Component:
         self.inputs, self.outputs, self.streams, self.registers = [], [], [], []
         self.sn = 0
 
-    def generate(self):
+    def generate(self, name):
 
         #align outputs
         max_offset = max([i.stream.offset for i in self.outputs])
@@ -38,7 +38,7 @@ class Component:
         "  end\n",
         "  assign q = delay_line[depth-1];\n",
         "endmodule\n\n",
-        "module uut(clk, ",
+        "module %s(clk, "%name,
         ", ".join(["%s"%i.iname for i in self.inputs+self.outputs]),
         ");\n",
         "  input clk;\n",
@@ -52,7 +52,7 @@ class Component:
         "".join([i.generate()+"\n" for i in self.streams+self.outputs]),
         "endmodule\n"])
 
-    def test(self, stimulus):
+    def test(self, stimulus, name="uut", debug=False):
         latency = max([i.stream.offset for i in self.outputs])
         stimulus_length = max([len(i) for i in stimulus.values()])
         stop_clocks = stimulus_length + latency + 1
@@ -62,8 +62,13 @@ class Component:
             f.write("".join(["%d\n"%i for i in s]))
             f.close()
 
+        if debug:
+            debug = '    $dumpfile("test.vcd");\n    $dumpvars(0,uut_tb);\n'
+        else:
+            debug = ''
+
         testbench = "".join([
-        "module uut_tb;\n",
+        "module %s_tb;\n"%name,
         "  reg clk;\n",
         "".join(["  reg [%s:0] %s;\n"%(i.bits-1, i.iname) 
             for i in self.inputs]),
@@ -74,12 +79,11 @@ class Component:
         "".join(["  integer %s_count;\n"%(i.iname) for i in self.inputs]),
         "".join(["  integer %s_count;\n"%(i.iname) for i in self.outputs]),
         "\n",
-        "  uut uut1 (clk, %s);\n"%(", ".join([i.iname 
+        "  %s %s1 (clk, %s);\n"%(name, name, ", ".join([i.iname 
             for i in self.inputs+self.outputs])),
         "  initial\n",
         "  begin\n",
-        #'    $dumpfile("test.vcd");\n',
-        #'    $dumpvars(0,uut_tb);\n',
+        debug,
         "".join(['    %s_file = $fopen("stim/%s");\n'%(i.iname, i.iname) 
             for i in self.outputs]),
         "".join(['    %s_file = $fopenr("stim/%s");\n'%(i.iname, i.iname) 
@@ -106,16 +110,16 @@ class Component:
         "  end\n",
         "endmodule\n"])
 
-        f = open("uut.v", 'w')
-        f.write(self.generate())
+        f = open("%s.v"%name, 'w')
+        f.write(self.generate(name))
         f.close()
 
-        f = open("uut_tb.v", 'w')
+        f = open("%s_tb.v"%name, 'w')
         f.write(testbench)
         f.close()
 
-        subprocess.call(["iverilog", "-o", "uut_tb", "uut.v", "uut_tb.v"])
-        subprocess.call(["vvp", "uut_tb"])
+        subprocess.call(["iverilog", "-o", "%s_tb"%name, "%s.v"%name, "%s_tb.v"%name])
+        subprocess.call(["vvp", "%s_tb"%name])
 
         response = {}
         for i in self.outputs:

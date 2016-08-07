@@ -17,19 +17,19 @@ from itertools import permutations
 from random import randint
 
 def get_expected():
-    subprocess.call("./reference_tests/mul")
-    inf = open("stim/mul_z_expected")
+    subprocess.call("./reference_tests/div")
+    inf = open("stim/div_z_expected")
     return [int(i) for i in inf]
 
 def test_function(a, b):
 
     stimulus = {
-        'mul_a':a, 
-        'mul_b':b
+        'div_a':a, 
+        'div_b':b
     }
 
-    response = ip_generator.pipeliner.component.test(stimulus, name="mul")
-    actual = response["mul_z"]
+    response = ip_generator.pipeliner.component.test(stimulus, name="div")
+    actual = response["div_z"]
     expected = get_expected()
 
     n = 0
@@ -44,13 +44,14 @@ def test_function(a, b):
             if j_exponent == 128 and j_mantissa != 0:
                 if(i_exponent == 128):
                     result = True
+                else:
+                    result = False
             else:
                 result = False
         else:
              result = True
         if not result:
             print "%08x %08x %08x %08x fail"%(a, b, i, j)
-            print n
             trace(response, n)
             #append failures to regression test file
             of = open("regression_tests", "a")
@@ -62,7 +63,7 @@ def test_function(a, b):
 
 
 ip_generator.pipeliner.component = Component()
-Output('mul_z', float_to_single(single_to_float(Input(32, 'mul_a')) * single_to_float(Input(32, 'mul_b'))))
+Output('div_z', float_to_single(single_to_float(Input(32, 'div_a')) / single_to_float(Input(32, 'div_b'))))
 
 count = 0
 

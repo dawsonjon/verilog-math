@@ -17,18 +17,18 @@ from random import randint
 
 def get_expected():
     subprocess.call("./reference_tests/add")
-    inf = open("z_expected")
+    inf = open("stim/add_z_expected")
     return [int(i) for i in inf]
 
 def test_function(a, b):
 
     stimulus = {
-        'a':a, 
-        'b':b
+        'add_a':a, 
+        'add_b':b
     }
 
-    response = ip_generator.pipeliner.component.test(stimulus)
-    actual = response["z"]
+    response = ip_generator.pipeliner.component.test(stimulus, name="add")
+    actual = response["add_z"]
     expected = get_expected()
 
     for a, b, i, j in zip(a, b, actual, expected):
@@ -42,6 +42,8 @@ def test_function(a, b):
             if j_exponent == 128 and j_mantissa != 0:
                 if(i_exponent == 128):
                     result = True
+                else:
+                    result = False
             else:
                 result = False
         else:
@@ -54,7 +56,7 @@ def test_function(a, b):
 
 
 ip_generator.pipeliner.component = Component()
-Output('z', float_to_single(single_to_float(Input(32, 'a')) + single_to_float(Input(32, 'b'))))
+Output('add_z', float_to_single(single_to_float(Input(32, 'add_a')) + single_to_float(Input(32, 'add_b'))))
 
 count = 0
 
