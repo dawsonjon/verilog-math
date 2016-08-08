@@ -295,8 +295,8 @@ def pipelined_mul(a, b, width):
     a = resize(a, width * num_parts)
     b = resize(b, width * num_parts)
 
-    a_parts = [a[lsb+width:lsb] for lsb in range(0, bits, width)]
-    b_parts = [b[lsb+width:lsb] for lsb in range(0, bits, width)]
+    a_parts = [a[lsb+width-1:lsb] for lsb in range(0, bits, width)]
+    b_parts = [b[lsb+width-1:lsb] for lsb in range(0, bits, width)]
 
 
     #calculate partial products
@@ -306,9 +306,9 @@ def pipelined_mul(a, b, width):
         b_significance = 0
         for b_part in b_parts:
             significance = a_significance + b_significance
-            if significance < bits:
-                partial_product = a_part * b_part
-                partial_product = resize(partial_product, width+significance)
+            if significance <= num_parts * width:
+                partial_product = resize(a_part, 2*width) * b_part
+                partial_product = resize(partial_product, (width*2)+significance)
                 partial_product <<= significance
                 partial_product = Register(partial_product)
                 partial_products.append(partial_product)
