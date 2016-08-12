@@ -12,3 +12,4 @@ div_tb
 div_tb.v
 z_expected
 test.vcd
+vivado*

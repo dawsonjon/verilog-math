@@ -1,4 +1,4 @@
-from math import log, floor, ceil
+from math import log, floor
 
 import pipeliner
 from pipeliner import *
@@ -39,16 +39,14 @@ class Float:
 
         z_s = a_s ^ b_s
         z_e = a_e - b_e
-        z_m, remainder = divide(a_m, b_m)
+        z_m, remainder = pipelined_divide(a_m, b_m, 18)
         z_m = resize(z_m, self.m_bits + 3)
 
         #handle underflow
         shift_amount = Constant(z_e.bits, self.e_min) - z_e
         shift_amount = select(0, shift_amount, shift_amount[z_e.bits-1])
-        z_m >>= shift_amount
+        z_m = pipelined_rshift(z_m, shift_amount, 10)
         z_e += shift_amount
-        z_m = Register(z_m)
-        z_e = Register(z_e)
 
         z_m, z_e = normalise(z_m, z_e, self.e_min)
         g = z_m[2]
@@ -87,21 +85,24 @@ class Float:
         z_s = a_s ^ b_s
         z_e = a_e + b_e + 1
         z_m = pipelined_mul(a_m, b_m)
-        
+
         #handle underflow
         shift_amount = Constant(z_e.bits, self.e_min) - z_e
         shift_amount = select(0, shift_amount, shift_amount[z_e.bits-1])
-        z_m = z_m >> shift_amount
+        z_m = z_m << shift_amount
         z_e += shift_amount
-        z_m = Register(z_m)
-        z_e = Register(z_e)
 
+        #z_s = Register(z_s)
+        #z_e = Register(z_e)
+        #z_m = Register(z_m)
+
+        #normalise
         z_m, z_e = normalise(z_m, z_e, self.e_min)
 
+        #round
         g = z_m[self.m_bits-1]
         r = z_m[self.m_bits-2]
-        s = z_m[self.m_bits-3:0] != Constant(self.m_bits, 0)
-        s = Register(s)
+        s = z_m[self.m_bits-3:0] != Constant(self.m_bits-2, 0)
         z_m = z_m[self.m_bits*2-1:self.m_bits]
         z_m, z_e = fpround(z_m, z_e, g, r, s)
 
@@ -142,8 +143,8 @@ class Float:
         difference = larger_e - smaller_e
         mask = Constant(smaller_m.bits, smaller_m.bits) - difference
         smaller_e = pipelined_add(smaller_e, difference, 18)
-        sticky = pipelined_lshift(smaller_m, mask, 4)
-        smaller_m = pipelined_rshift(smaller_m, difference, 4)
+        sticky = pipelined_lshift(smaller_m, mask, 10)
+        smaller_m = pipelined_rshift(smaller_m, difference, 10)
         sticky = sticky != 0
         smaller_m |= sticky
 
@@ -240,103 +241,81 @@ def normalise(m, e, e_min):
 
     #try to normalise, but not if it would make the exponent less than the 
     #minimum in this case leave the number denormalised
+    
     lz = leading_zeros(m)
-    lz = Register(lz)
     max_shift = e - Constant(e.bits, e_min)
+
+    #lz = Register(lz)
+    #lz = Register(max_shift)
+
     shift_amount = select(lz, max_shift, resize(lz, e.bits) <= max_shift)
-    shift_amount = Register(shift_amount)
     m = m << shift_amount
     e = e - shift_amount
 
-    return Register(m), Register(e)
+    return m, e
 
 def fpround(m, e, g, r, s):
 
     roundup = g & (r | s | m[0])
-    m_plus_1 = resize(m, m.bits+1)+1
-    m = select(m_plus_1, m, roundup)
+    m = resize(m, m.bits+1) + roundup
 
     #correct for overflow in rounding
     overflow = m[m.bits-1]
     m = select(m[m.bits-1:1], m[m.bits-2:0], overflow)
-    e = e + overflow
-    return Register(m), Register(e)
+    e = select(e + 1, e, overflow)
+    return m, e
 
-#def leading_zeros(stream):
-    #out = stream.bits
-    #for i in range(stream.bits):
-        #out=select(stream.bits -1-i, out, stream[i])
-    #return out
+def leading_zeros(stream):
+    out = stream.bits
+    for i in range(stream.bits):
+        out=select(stream.bits -1-i, out, stream[i])
+    return out
 
-#def leading_zeros(x):
-    #if x.bits == 2:
-        #return ~x[1]
-    #else:
-        #split_point = int(x.bits - 2**(ceil(log(x.bits, 2))-1))
-        #print x.bits, split_point
-        #msbs, lsbs = x[x.bits-1:split_point], x[split_point-1:0]
-        #msbs_are_zero = msbs == 0
-        #lsb_zeros = leading_zeros(lsbs)
-        #msb_zeros = leading_zeros(msbs)
-        #while(lsb_zeros.bits < msb_zeros.bits):
-            #lsb_zeros = cat(Constant(1, 0), lsb_zeros)
-            #
-        #return cat(msbs_are_zero, select(lsb_zeros, msb_zeros, msbs_are_zero)) 
+#def pipelined_add(a, b, width):
+#
+    #"""Create a pipelined adder, width is the maximum number of bits
+    #to add before a pipeline register is added"""
+#
+    #bits = max([a.bits, b.bits])
+    #a = resize(a, bits)
+    #b = resize(b, bits)
+    #for lsb in range(0, bits, width):
+        #msb = min([lsb + width - 1, bits-1])
+        #a_part = resize(a[msb:lsb], width+1)
+        #b_part = resize(b[msb:lsb], width+1)
+        #if lsb:
+            #part_sum = a_part+b_part+carry
+            #z = Register(cat(part_sum[width-1:0], z))
+        #else:
+            #part_sum = a_part+b_part
+            #z = Register(part_sum[width-1:0])
+        #carry = part_sum[width]
+        #carry = Register(carry)
+    #return z[bits-1:0]
 
-def leading_zeros(x):
-    if x.bits == 2:
-        return cat(~x[1] & ~x[0], ~x[1] & x[0])
-    else:
-
-        next_power_2 = 0
-        while 2**next_power_2 < x.bits:
-            next_power_2 += 1
-
-        while x.bits < 2**next_power_2:
-            x = cat(x, Constant(1, 1))
-
-        msbs, lsbs = x[x.bits-1:x.bits//2], x[x.bits//2-1:0]
-        lsb_zeros = leading_zeros(lsbs)
-        msb_zeros = leading_zeros(msbs)
-
-        lsbs_are_zero = lsb_zeros[lsb_zeros.bits-1]
-        msbs_are_zero = msb_zeros[msb_zeros.bits-1]
-        lsb_zeros = lsb_zeros[lsb_zeros.bits-2:0]
-        msb_zeros = msb_zeros[msb_zeros.bits-2:0]
-            
-        return cat(
-            msbs_are_zero & lsbs_are_zero, 
-            cat(
-                msbs_are_zero & ~lsbs_are_zero,
-                select(
-                    lsb_zeros,
-                    msb_zeros,
-                    msbs_are_zero
-                )
-            )
-        )
-
-def pipelined_add(a, b, width):
-
-    """Create a pipelined adder, width is the maximum number of bits
-    to add before a pipeline register is added"""
-
-    bits = max([a.bits, b.bits])
-    a = resize(a, bits)
-    b = resize(b, bits)
-    for lsb in range(0, bits, width):
-        msb = min([lsb + width - 1, bits-1])
-        a_part = a[msb:lsb]
-        b_part = b[msb:lsb]
-        if lsb:
-            part_sum = resize(a_part, width+1)+b_part+carry
-            z = cat(part_sum[width-1:0], z)
-        else:
-            part_sum = resize(a_part, width+1)+b_part
-            z = part_sum[width-1:0]
-        carry = part_sum[width]
-        carry = Register(carry)
-    return z[bits-1:0]
+#def pipelined_sub(a, b, width):
+#
+    #"""Create a pipelined subtracter, width is the maximum number of bits
+    #to add before a pipeline register is added"""
+#
+    #bits = max([a.bits, b.bits])
+    #a = resize(a, bits)
+    #b = resize(b, bits)
+    #for lsb in range(0, bits, width):
+        #msb = min([lsb + width - 1, bits-1])
+        #a_part = resize(a[msb:lsb], width+1)
+        #b_part = resize(b[msb:lsb], width+1)
+        #if lsb:
+            #part_sum = a_part+(~b_part)+carry
+            ##z = Register(cat(part_sum[width-1:0], z))
+            #z = cat(part_sum[width-1:0], z)
+        #else:
+            #part_sum = a_part-b_part
+            ##z = Register(part_sum[width-1:0])
+            #z = part_sum[width-1:0]
+        #carry = ~part_sum[width]
+        ##carry = Register(carry)
+    #return z[bits-1:0]
 
 def pipelined_mul(a, b):
 
@@ -365,36 +344,16 @@ def pipelined_mul(a, b):
             else:
                 z = cat(total[16:0], z)
             total = product + (total >> 17)
-            total = Register(total)
+            #total = Register(total)
         else:
             total = product + total
-            total = Register(total)
+            #total = Register(total)
         old_lsb = lsb
     z = cat(total[16:0], z)
 
     return z[(bits*2)-1:0]
+    
 
-def pipelined_sub(a, b, width):
-
-    """Create a pipelined subtractor, width is the maximum number of bits
-    to add before a pipeline register is added"""
-
-    bits = max([a.bits, b.bits])
-    a = resize(a, bits)
-    b = resize(b, bits)
-    for lsb in range(0, bits, width):
-        msb = min([lsb + width - 1, bits-1])
-        a_part = a[msb:lsb]
-        b_part = b[msb:lsb]
-        if lsb:
-            part_sum = resize(a_part, width+1)+(~b_part)+carry
-            z = cat(part_sum[width-1:0], z)
-        else:
-            part_sum = resize(a_part, width+1)-b_part
-            z = part_sum[width-1:0]
-        carry = ~part_sum[width]
-        carry = Register(carry)
-    return z[bits-1:0]
 
 def pipelined_lshift(a, b, depth):
 
@@ -442,3 +401,20 @@ def pipelined_rshift(a, b, depth):
             depth_count += 1
 
     return z
+
+def pipelined_divide(dividend, divisor, width):
+    bits = max([dividend.bits, divisor.bits])
+    remainder = Constant(bits, 0)
+    quotient = Constant(bits, 0)
+    for i in range(bits):
+        shifter = remainder << 1 | dividend[bits-1-i]
+        difference = pipelined_sub(resize(shifter, bits+1), divisor, 18)
+        negative = difference[bits]
+        #test_probe(negative, "negative")
+        remainder = select(shifter, difference, negative)
+        quotient = quotient << 1
+        quotient = select(quotient, quotient | 1, negative)
+    quotient = Register(quotient)
+    remainder = Register(remainder)
+
+    return quotient, remainder
