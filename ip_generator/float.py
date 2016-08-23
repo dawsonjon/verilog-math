@@ -55,6 +55,7 @@ class Float:
         r = z_m[1]
         s = z_m[0] | (remainder != 0)
         z_m = z_m >> 3
+        s = Register(s)
         z_m, z_e = fpround(z_m, z_e, g, r, s)
 
 
@@ -141,9 +142,9 @@ class Float:
         #increase exponent of smaller operand to match larger operand
         difference = larger_e - smaller_e
         mask = Constant(smaller_m.bits, smaller_m.bits) - difference
-        smaller_e = pipelined_add(smaller_e, difference, 18)
-        sticky = pipelined_lshift(smaller_m, mask, 4)
-        smaller_m = pipelined_rshift(smaller_m, difference, 4)
+        smaller_e = smaller_e + difference
+        sticky = smaller_m << mask
+        smaller_m = smaller_m >> difference
         sticky = sticky != 0
         smaller_m |= sticky
 
@@ -161,16 +162,20 @@ class Float:
 
         #if the signs differ perform a subtraction instead
         add_sub = a_s == b_s
-        negative_smaller_m = pipelined_sub(Constant(smaller_m.bits, 0), smaller_m, 18)
+        negative_smaller_m = Constant(smaller_m.bits, 0) - smaller_m
         smaller_m = select(smaller_m, negative_smaller_m, add_sub)
+        smaller_m = Register(smaller_m)
+        larger_m = Register(larger_m)
 
         #perform the addition
         #Add one to the exponent, assuming that mantissa overflow
         #has occurred. If it hasn't the msb of the result will be zero
         #and the exponent will be reduced again accordingly.
-        z_m = pipelined_add(larger_m, smaller_m, 18)
-        z_s = select(0, larger_s, z_m == 0)
+        z_m = larger_m + smaller_m
+        z_s = select(0, larger_s, Register(z_m) == 0)
         z_e = larger_e + 1 
+        z_m = Register(z_m)
+        z_e = Register(z_e)
 
         #normalise the result
         z_m, z_e = normalise(z_m, z_e, self.e_min)
@@ -180,6 +185,7 @@ class Float:
         r = z_m[2]
         s = z_m[1] | z_m[0]
         z_m = z_m[self.m_bits+3:4]
+        s = Register(s)
         z_m, z_e = fpround(z_m, z_e, g, r, s)
 
         #handle special cases
