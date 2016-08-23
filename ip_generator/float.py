@@ -31,20 +31,23 @@ class Float:
         a_nan = self.nan
         b_nan = other.nan
 
+        
         a_m, a_e = normalise(a_m, a_e, self.e_min * 2)
         b_m, b_e = normalise(b_m, b_e, self.e_min * 2)
 
-        a_m = resize(a_m, (2*self.m_bits) + 3)
-        a_m = a_m << (self.m_bits + 2)
+        a_m = resize(a_m, self.m_bits+3) << 3
+        b_m = resize(b_m, self.m_bits+3) << 3
 
         z_s = a_s ^ b_s
         z_e = a_e - b_e
-        z_m, remainder = divide(a_m, b_m)
-        z_m = resize(z_m, self.m_bits + 3)
+        z_m, remainder = fraction_divide(a_m, b_m)
 
         #handle underflow
+        z_e = Register(z_e)
         shift_amount = Constant(z_e.bits, self.e_min) - z_e
+        shift_amount = Register(shift_amount)
         shift_amount = select(0, shift_amount, shift_amount[z_e.bits-1])
+        shift_amount = Register(shift_amount)
         z_m >>= shift_amount
         z_e += shift_amount
         z_m = Register(z_m)
@@ -54,14 +57,14 @@ class Float:
         g = z_m[2]
         r = z_m[1]
         s = z_m[0] | (remainder != 0)
-        z_m = z_m >> 3
+        z_m = (z_m>>3)[self.m_bits-1:0]
         s = Register(s)
         z_m, z_e = fpround(z_m, z_e, g, r, s)
 
 
         overflow = s_gt(z_e, Constant(self.e_bits+1, self.e_max))
         z_e = z_e[self.e_bits-1:0]
-        z_inf = overflow | a_inf | (b_m == 0)
+        z_inf = overflow | a_inf | Register(b_m == 0)
         z_nan = a_nan | b_nan
 
         #handle divide by inf
@@ -448,3 +451,21 @@ def pipelined_rshift(a, b, depth):
             depth_count += 1
 
     return z
+
+def fraction_divide(dividend, divisor):
+    bits = max([dividend.bits, divisor.bits])
+    shifter = dividend
+    quotient = Constant(bits, 0)
+    for i in range(bits):
+        difference = resize(shifter, bits+1) - divisor
+        negative = difference[bits]
+        remainder = select(shifter, difference, negative)
+        quotient = quotient << 1
+        quotient = select(quotient, quotient | 1, negative)
+        quotient = Register(quotient)
+        remainder = Register(remainder)
+        shifter = remainder << 1 | Constant(1, 0)
+
+    test_probe(remainder, "remainder")
+
+    return quotient, remainder
