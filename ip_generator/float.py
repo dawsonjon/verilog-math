@@ -199,6 +199,25 @@ class Float:
         
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
 
+    def to_int(self, bits=32):
+
+        integer = cat(self.m, Constant(bits-self.m_bits, 0))
+        integer >>= Constant(self.e_bits, bits)-self.e-1
+        integer = Register(integer)
+
+        overflow = s_ge(self.e, Constant(self.e_bits, bits-1)) 
+        overflow |= self.inf
+        overflow |= self.nan
+        underflow = s_lt(self.e, 0) | (self.m==0)
+
+        negative_integer = Register(-integer)
+        integer = select(negative_integer, integer, self.s)
+        integer = select(Constant(bits, 0), integer, underflow)
+        integer = select(Constant(bits, 1<<(bits-1)), integer, overflow)
+        Register(integer)
+
+        return integer
+
 class FPConstant(Float):
     def __init__(self, ebits, mbits, value):
         s = 1 if float(value) < 0 else 0
@@ -207,6 +226,28 @@ class FPConstant(Float):
         m = value/(2**e)
         m *= (2**(mbits-1))
         m = int(round(m))
+
+def int_to_float(integer, e_bits=8, m_bits=24):
+    bits = integer.bits
+    s=integer[bits-1]
+    integer = select(-integer, integer, s)
+    integer = Register(integer)
+    lz = leading_zeros(integer)
+    lz = Register(lz)
+    e = Constant(e_bits, integer.bits-1)-lz
+    m = integer << lz
+    test_probe(m, "m")
+    m = Register(m)
+    guard = m[bits-m_bits-1]
+    round_bit = m[bits-m_bits-2]
+    sticky = m[bits-m_bits-3:0] != 0
+    sticky = Register(sticky)
+    print bits-1, bits-m_bits
+    m = m[bits-1:bits-m_bits]
+    test_probe(m, "m")
+    m, e = fpround(m, e, guard, round_bit, sticky)
+    return Float(s, e, m, Constant(1, 0), Constant(1, 0), e_bits, m_bits)
+
 
 def single_to_float(a):
     s = a[31]
@@ -270,27 +311,6 @@ def fpround(m, e, g, r, s):
     m = select(m[m.bits-1:1], m[m.bits-2:0], overflow)
     e = e + overflow
     return Register(m), Register(e)
-
-#def leading_zeros(stream):
-    #out = stream.bits
-    #for i in range(stream.bits):
-        #out=select(stream.bits -1-i, out, stream[i])
-    #return out
-
-#def leading_zeros(x):
-    #if x.bits == 2:
-        #return ~x[1]
-    #else:
-        #split_point = int(x.bits - 2**(ceil(log(x.bits, 2))-1))
-        #print x.bits, split_point
-        #msbs, lsbs = x[x.bits-1:split_point], x[split_point-1:0]
-        #msbs_are_zero = msbs == 0
-        #lsb_zeros = leading_zeros(lsbs)
-        #msb_zeros = leading_zeros(msbs)
-        #while(lsb_zeros.bits < msb_zeros.bits):
-            #lsb_zeros = cat(Constant(1, 0), lsb_zeros)
-            #
-        #return cat(msbs_are_zero, select(lsb_zeros, msb_zeros, msbs_are_zero)) 
 
 def leading_zeros(x):
     if x.bits == 2:
