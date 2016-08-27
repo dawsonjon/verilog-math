@@ -466,6 +466,4 @@ def fraction_divide(dividend, divisor):
         remainder = Register(remainder)
         shifter = remainder << 1 | Constant(1, 0)
 
-    test_probe(remainder, "remainder")
-
     return quotient, remainder

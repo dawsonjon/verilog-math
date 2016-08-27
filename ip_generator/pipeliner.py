@@ -425,6 +425,39 @@ def s_divide(dividend, divisor):
     remainder = select(-remainder, remainder, dividend_sign)
     return quotient, remainder
 
+def sqrt(x):
+    bits = x.bits
+    result_bits = int(math.ceil(math.log((2**bits)-1)))
+
+    guess = Constant(result_bits, 0)
+    guess_squared = Constant(bits+1, 0)
+
+    #Calculate 1 bit at a time from msb to lsb
+    #Each bit is set if the guess squared is still less than x
+    #
+    #Instead of squaring the new guess, calculate the new guess
+    #squared from the new bit value using shifts and adds.
+    #
+    #(guess + 2^bit)^2 <= x
+    #guess^2 + 2*guess*2^bit + 2^bit^2 <= x
+
+    for bit in reversed(range(result_bits-1)):
+        new_guess_squared = guess_squared + (guess << (bit+1)) | (1<<bit*2)
+        better = new_guess_squared <= x
+        guess_squared = select(new_guess_squared, guess_squared, better)
+        guess = select(guess + Constant(bits, 2**bit), guess, better)
+
+    return guess
+
+def sqrt_rounded(x):
+    bits = x.bits
+    x = resize(x, x.bits+2)<<2
+    x = sqrt(x)
+    x += 1
+    x >>= 1
+    x = x[bits-1:0]
+    return x
+
 
 component = Component()
 
