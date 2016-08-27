@@ -7,15 +7,35 @@ import cores
 from numpy import float32
 from itertools import permutations
 from random import randint
+from multiprocessing import Process
 
 def get_expected(core_name):
     subprocess.call("./reference_tests/"+core_name)
     inf = open("stim/%s_z_expected"%core_name)
     return [int(i) for i in inf]
 
-def test_function(core_name, core, a, b):
-    print core_name
+def test_convert(core_name, core, a):
+    print "testing", "to_int", "..."
+    stimulus = {core_name+'_a':a}
 
+    response = core.test(stimulus, name=core_name)
+    actual = response[core_name+"_z"]
+    expected = get_expected(core_name)
+
+    n = 0
+    for a, i, j in zip(a, actual, expected):
+        if(j != i):
+            result = False
+        else:
+            result = True
+        if not result:
+            trace(response, n)
+            print "%08x %08x %08x fail"%(a, i, j)
+            sys.exit(1)
+        n += 1
+
+def test_function(core_name, core, a, b):
+    print "testing", core_name, "..."
     stimulus = {
         core_name+'_a':a, 
         core_name+'_b':b
@@ -60,9 +80,32 @@ def test_binary_cores(stimulus_a, stimulus_b):
         "div":cores.div, 
         "add":cores.add
     }
+    processes = []
     for core_name, core in binary_cores.iteritems():
-        test_function(core_name, core, stimulus_a, stimulus_b)
+        processes.append(
+            Process(
+                target=test_function, 
+                args=[core_name, core, stimulus_a, stimulus_b]
+            )
+        )
 
+    converter_cores = {
+        "to_int":cores.to_int, 
+        "to_float":cores.to_float, 
+    }
+    for core_name, core in converter_cores.iteritems():
+        processes.append(
+            Process(
+                target = test_convert,
+                args=[core_name, core, stimulus_a]
+            )
+        )
+
+    for i in processes:
+        i.start()
+
+    for i in processes:
+        i.join()
 
 
 ###############################################################################
