@@ -3,8 +3,6 @@ from math import log, floor, ceil
 import pipeliner
 from pipeliner import *
 
-from test_probe import test_probe, trace
-
 class Float:
     def __init__(self, sign, exponent, mantissa, inf, nan, ebits=8, mbits=24):
         self.s = sign
@@ -16,6 +14,54 @@ class Float:
         self.m_bits = mbits
         self.e_min = -(1<<(ebits-1))+2
         self.e_max = (1<<(ebits-1))-1
+
+    def sqrt(self, debug=None):
+
+        #add a bit to e so that we can test for overflow
+        a_e = s_resize(self.e, self.e_bits+2)
+        a_m = self.m
+        a_s = self.s
+        a_inf = self.inf
+        a_nan = self.nan
+        
+        a_m, a_e = normalise(a_m, a_e, self.e_min * 2)
+        a_m = resize(a_m, self.m_bits*2+3)
+
+        #if a_e is not even, rescale e and m 
+        odd = a_e[0]
+        a_e = select(a_e -  1,  a_e, odd)
+        a_m = select(a_m << 1, a_m, odd)
+
+        #pre-multiply m so that we get the useful bits, add 1 bit for rounding
+        a_m = a_m << self.m_bits+1
+        z_m = sqrt(a_m)
+        z_m = z_m[self.m_bits:0]
+        z_s = a_s
+        
+        #sqrt of 2^e == s^0.5*e
+        z_e = s_sr(a_e, Constant(a_e.bits, 1))
+
+        #handle underflow
+        z_e = Register(z_e)
+        shift_amount = Constant(z_e.bits, self.e_min) - z_e
+        shift_amount = select(0, shift_amount, shift_amount[z_e.bits-1])
+        shift_amount = Register(shift_amount)
+        z_m >>= shift_amount
+        z_e += shift_amount
+        z_m = Register(z_m)
+        z_e = Register(z_e)
+
+        #normalise
+        z_m, z_e = normalise(z_m, z_e, self.e_min)
+        g = z_m[0]
+        z_m = z_m[self.m_bits:1]
+        z_m, z_e = fpround(z_m, z_e, g, Constant(1, 1), Constant(1, 0))
+
+        z_e = z_e[self.e_bits-1:0]
+        z_inf = a_inf
+        z_nan = a_nan | (a_s & (z_m != 0))
+
+        return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
 
     def __div__(self, other):
 
@@ -236,20 +282,17 @@ def int_to_float(integer, e_bits=8, m_bits=24):
     lz = Register(lz)
     e = Constant(e_bits, integer.bits-1)-lz
     m = integer << lz
-    test_probe(m, "m")
     m = Register(m)
     guard = m[bits-m_bits-1]
     round_bit = m[bits-m_bits-2]
     sticky = m[bits-m_bits-3:0] != 0
     sticky = Register(sticky)
-    print bits-1, bits-m_bits
     m = m[bits-1:bits-m_bits]
-    test_probe(m, "m")
     m, e = fpround(m, e, guard, round_bit, sticky)
     return Float(s, e, m, Constant(1, 0), Constant(1, 0), e_bits, m_bits)
 
 
-def single_to_float(a):
+def single_to_float(a, debug=None):
     s = a[31]
     e = a[30:23] - 127
     m = a[22:0]

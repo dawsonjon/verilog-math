@@ -4,10 +4,33 @@ sys.path.append("..")
 import subprocess
 import random
 import cores
+import struct
 from numpy import float32
 from itertools import permutations
 from random import randint
 from multiprocessing import Process
+
+def trace(response, n):
+    for name, values in response.iteritems():
+        print name, values[n]
+
+def asfloat(x):
+    string = ""
+    for i in range(4):
+        byte = x >> 24
+        byte &= 0xff
+        string += chr(byte)
+        x <<= 8
+    return struct.unpack(">f", string)[0]
+
+def failure(a, b, actual, expected):
+    print "a        b        actual   expected"
+    print "======== ======== ======== ========"
+    print "%08x %08x %08x %08x fail"%(a, b, actual, expected)
+    print "a", asfloat(a)
+    print "b", asfloat(b)
+    print "actual", asfloat(actual)
+    print "expected", asfloat(expected)
 
 def get_expected(core_name):
     subprocess.call("./reference_tests/"+core_name)
@@ -15,7 +38,7 @@ def get_expected(core_name):
     return [int(i) for i in inf]
 
 def test_convert(core_name, core, a):
-    print "testing", "to_int", "..."
+    print "testing", core_name, "..."
     stimulus = {core_name+'_a':a}
 
     response = core.test(stimulus, name=core_name)
@@ -31,6 +54,45 @@ def test_convert(core_name, core, a):
         if not result:
             trace(response, n)
             print "%08x %08x %08x fail"%(a, i, j)
+            sys.exit(1)
+        n += 1
+
+def test_unary(core_name, core, a, b):
+    print "testing", core_name, "..."
+    stimulus = {
+        core_name+'_a':a, 
+    }
+
+    response = core.test(stimulus, name=core_name)
+    actual = response[core_name+"_z"]
+    expected = get_expected(core_name)
+
+    n = 0
+    for a, b, i, j in zip(a, b, actual, expected):
+        if(j != i):
+            j_mantissa = j & 0x7fffff
+            j_exponent = ((j & 0x7f800000) >> 23) - 127
+            j_sign = ((j & 0x80000000) >> 31)
+            i_mantissa = i & 0x7fffff
+            i_exponent = ((i & 0x7f800000) >> 23) - 127
+            i_sign = ((i & 0x80000000) >> 31)
+            if j_exponent == 128 and j_mantissa != 0:
+                if(i_exponent == 128):
+                    result = True
+                else:
+                    result = False
+            else:
+                result = False
+        else:
+             result = True
+        if not result:
+            failure(a, b, i, j)
+            print "failed in vector", n
+            trace(response, n)
+            #append failures to regression test file
+            of = open("regression_tests", "a")
+            of.write("%i %i\n"%(a, b))
+            of.close()
             sys.exit(1)
         n += 1
 
@@ -66,7 +128,7 @@ def test_function(core_name, core, a, b):
         if not result:
             print "%08x %08x %08x %08x fail"%(a, b, i, j)
             print n
-            #trace(response, n)
+            trace(response, n)
             #append failures to regression test file
             of = open("regression_tests", "a")
             of.write("%i %i\n"%(a, b))
@@ -101,12 +163,25 @@ def test_binary_cores(stimulus_a, stimulus_b):
             )
         )
 
+    unary_cores = {
+        "sqrt":cores.sqrt, 
+    }
+    for core_name, core in unary_cores.iteritems():
+        processes.append(
+            Process(
+                target = test_unary,
+                args=[core_name, core, stimulus_a, stimulus_b]
+            )
+        )
+
     for i in processes:
+        i.daemon=True
         i.start()
 
     for i in processes:
         i.join()
-
+        if i.exitcode:
+            exit(i.exitcode)
 
 ###############################################################################
 #tests start here

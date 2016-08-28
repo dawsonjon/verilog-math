@@ -4,3 +4,5 @@ gcc -o mul mul.c
 gcc -o div div.c
 gcc -o to_int to_int.c
 gcc -o to_float to_float.c
+gcc -o sqrt sqrt.c -lm
+

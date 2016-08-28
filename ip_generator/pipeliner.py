@@ -1,6 +1,7 @@
 """A tool to generate pipelined logic from expressions"""
 import subprocess
 from math import ceil, log
+import math
 
 
 class Component:
@@ -17,9 +18,14 @@ class Component:
         max_offset = max([i.stream.offset for i in self.outputs])
         delays = [(not i.stream.constant) and 
                 max_offset - i.stream.offset for i in self.outputs]
+
         for i, d in zip(self.outputs, delays):
             if d:
                 i.stream = Register(i.stream, d)
+                i.stream.add_to_component(self)
+
+        for i in self.outputs:
+            i.stream.add_to_component(self)
 
         return "".join([
         "module dq (clk, q, d);\n",
@@ -51,6 +57,7 @@ class Component:
         "\n",
         "".join([i.generate()+"\n" for i in self.streams+self.outputs]),
         "endmodule\n"])
+
 
     def test(self, stimulus, name="uut", debug=False):
         latency = max([i.stream.offset for i in self.outputs])
@@ -133,14 +140,22 @@ class Stream:
     """A stream is a base class from which other expression classes are
     derived, all streams have a name, bits and constant property"""
 
-    def __init__(self, bits, offset):
+    def __init__(self, bits, offset, sources):
         """This constructor will usually be called by a derived object class"""
 
-        global component
-        self.name, self.bits, self.offset = "s_"+str(component.sn), bits, offset
-        component.sn += 1
-        component.streams.append(self)
+        self.bits, self.offset = bits, offset
         self.constant = False
+        self.added = False
+        self.sources = sources
+
+    def add_to_component(self, component):
+        if not self.added:
+            self.name = "s_"+str(component.sn)
+            component.sn += 1
+            component.streams.append(self)
+            for source in self.sources:
+                source.add_to_component(component)
+            self.added = True
 
     def __add__(self, other):
         return add(self, other)
@@ -190,13 +205,13 @@ class Stream:
 class Input(Stream):
     """An input to the component."""
 
-    def __init__(self, bits, iname):
+    def __init__(self, component, bits, iname):
         """add an output to component
         arguments:
             bits, the width of the input in bits
             iname, the name of the input"""
-        global component
-        Stream.__init__(self, bits, 0)
+
+        Stream.__init__(self, bits, 0, [])
         self.iname = iname
         component.inputs.append(self)
 
@@ -206,12 +221,11 @@ class Input(Stream):
 class Output:
     """An output of the component."""
 
-    def __init__(self, oname, stream):
+    def __init__(self, component, oname, stream):
         """add an output to component
         arguments:
             iname, the name of the input
             stream, the expression to be output"""
-        global component
         stream = const(stream)
         self.iname, self.bits, self.stream = oname, stream.bits, stream
         component.outputs.append(self)
@@ -219,17 +233,31 @@ class Output:
     def generate(self):
         return "  assign %s = %s;"%(self.iname, self.stream.name)
 
+def number_of_bits_needed(x):
+    if x > 0:
+        n = 1
+        while 1:
+            max_number = 2**n-1
+            if max_number >= x:
+                return n
+            n+=1
+    elif x < 0:
+        x = -x
+        n = 1
+        while 1:
+            max_number = 2**(n-1)
+            if max_number >= x:
+                return n
+            n+=1
+    else:
+        return 1
+
+
 def const(i):
     if isinstance(i, Stream):
         return i
 
-    if i > 0:
-        bits = int(ceil(log(i+1, 2)))
-    elif i<0:
-        bits = int(ceil(log(abs(i), 2)))+1
-    else:
-        bits = 1
-
+    bits = number_of_bits_needed(i)
     return Constant(bits, int(i))
 
 class Constant(Stream):
@@ -240,7 +268,7 @@ class Constant(Stream):
         arguments:
             bits - the width of the constant in bits
             value - the value of the constant (must be convertible to an int)"""
-        Stream.__init__(self, bits, 0)
+        Stream.__init__(self, bits, 0, [])
         self.value = int(value)
         self.constant = True
 
@@ -260,9 +288,9 @@ class Register(Stream):
         arguments:
             bits - the width of the constant in bits
             delay=1 - the number of clock cycles latency"""
-        global component
+
         i = const(i)
-        Stream.__init__(self, i.bits, i.offset+delay)
+        Stream.__init__(self, i.bits, i.offset+delay, [i])
         self.i, self.delay = i, delay
 
     def generate(self):
@@ -284,11 +312,12 @@ class Combinational(Stream):
             bits - width of expression in bits
             code - code template"""
         inputs = [const(i) for i in inputs]
-        Stream.__init__(self, bits, max([i.offset for i in inputs]))
-        delays = [(not i.constant) and self.offset - i.offset for i in inputs]
+        max_delay = max([i.offset for i in inputs])
+        delays = [(not i.constant) and max_delay - i.offset for i in inputs]
         self.code = code
         self.inputs = [(Register(i, int(d)) if d else i) 
                 for i, d in zip(inputs, delays)]
+        Stream.__init__(self, bits, max_delay, self.inputs)
 
     def generate(self):
         return "".join(self.code.format(*([self.name] + [i.name 
@@ -333,11 +362,11 @@ def s_mul(x, y):
 def s_sr(x, y):
     x, y = const(x), const(y)
     return Combinational([x, y], max([x.bits, y.bits]), 
-            "  assign {0} = $signed({1}) >> $signed({2});")
+            "  assign {0} = $signed({1}) >>> $signed({2});")
 def s_sl(x, y):
     x, y = const(x), const(y)
     return Combinational([x, y], max([x.bits, y.bits]), 
-            "  assign {0} = $signed({1}) << $signed({2});")
+            "  assign {0} = $signed({1}) <<< $signed({2});")
 def s_gt(x, y):
     return Combinational([x, y], 1, 
             '  assign {0} = $signed({1}) > $signed({2});')
@@ -427,7 +456,10 @@ def s_divide(dividend, divisor):
 
 def sqrt(x):
     bits = x.bits
-    result_bits = int(math.ceil(math.log((2**bits)-1)))
+
+    largest_number = (2**bits)-1
+    largest_sqrt = ceil(math.sqrt(largest_number))
+    result_bits = int(ceil(log(largest_sqrt, 2.0)))
 
     guess = Constant(result_bits, 0)
     guess_squared = Constant(bits+1, 0)
@@ -441,8 +473,8 @@ def sqrt(x):
     #(guess + 2^bit)^2 <= x
     #guess^2 + 2*guess*2^bit + 2^bit^2 <= x
 
-    for bit in reversed(range(result_bits-1)):
-        new_guess_squared = guess_squared + (guess << (bit+1)) | (1<<bit*2)
+    for bit in reversed(range(result_bits)):
+        new_guess_squared = guess_squared + (guess << (bit+1)) | 1<<bit*2
         better = new_guess_squared <= x
         guess_squared = select(new_guess_squared, guess_squared, better)
         guess = select(guess + Constant(bits, 2**bit), guess, better)
@@ -458,8 +490,6 @@ def sqrt_rounded(x):
     x = x[bits-1:0]
     return x
 
-
-component = Component()
 
 if __name__ == "__main__":
     a = Input(8, 'a')

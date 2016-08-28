@@ -5,6 +5,7 @@ sn = 0
 
 def test_probe(pipe, label):
     global sn, probes
+    print "probe", pipe, label
     probes.append(label+str(sn))
     Output(label+str(sn), pipe)
     sn += 1
@@ -12,5 +13,6 @@ def test_probe(pipe, label):
 def trace(response, n):
     global probes
     for i in probes:
-        print i, ":", response[i][n]
+        if i in response:
+            print i, ":", response[i][n]
 
