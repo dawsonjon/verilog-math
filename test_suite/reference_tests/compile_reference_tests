@@ -2,6 +2,12 @@
 gcc -o add add.c
 gcc -o mul mul.c
 gcc -o div div.c
+gcc -o gt gt.c
+gcc -o lt lt.c
+gcc -o le le.c
+gcc -o ge ge.c
+gcc -o eq eq.c
+gcc -o ne ne.c
 gcc -o to_int to_int.c
 gcc -o to_float to_float.c
 gcc -o sqrt sqrt.c -lm

@@ -96,6 +96,34 @@ def test_unary(core_name, core, a, b):
             sys.exit(1)
         n += 1
 
+def test_comparator(core_name, core, a, b):
+    print "testing", core_name, "..."
+    stimulus = {
+        core_name+'_a':a, 
+        core_name+'_b':b
+    }
+
+    response = core.test(stimulus, name=core_name)
+    actual = response[core_name+"_z"]
+    expected = get_expected(core_name)
+
+    n = 0
+    for a, b, i, j in zip(a, b, actual, expected):
+        if(j != i):
+            result = False
+        else:
+            result = True
+        if not result:
+            failure(a, b, i, j)
+            print n
+            trace(response, n)
+            #append failures to regression test file
+            of = open("regression_tests", "a")
+            of.write("%i %i\n"%(a, b))
+            of.close()
+            sys.exit(1)
+        n += 1
+
 def test_function(core_name, core, a, b):
     print "testing", core_name, "..."
     stimulus = {
@@ -170,6 +198,21 @@ def test_binary_cores(stimulus_a, stimulus_b):
         processes.append(
             Process(
                 target = test_unary,
+                args=[core_name, core, stimulus_a, stimulus_b]
+            )
+        )
+    comparator_cores = {
+        "gt":cores.gt, 
+        "lt":cores.lt, 
+        "le":cores.le, 
+        "ge":cores.ge, 
+        "eq":cores.eq, 
+        "ne":cores.ne, 
+    }
+    for core_name, core in comparator_cores.iteritems():
+        processes.append(
+            Process(
+                target = test_comparator,
                 args=[core_name, core, stimulus_a, stimulus_b]
             )
         )

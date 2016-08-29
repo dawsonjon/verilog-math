@@ -245,6 +245,41 @@ class Float:
         
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
 
+    def __sub__(self, other):
+        f = other
+        f = Float(~f.s, f.e, f.m, f.inf, f.e_bits, f.m_bits)
+        return self + f
+
+    def __gt__(self, other, debug=None):
+        result = other - self
+        return result.s & ~self.nan & ~other.nan
+
+    def __lt__(self, other, debug=None):
+        result = self - other
+        return result.s & ~self.nan & ~other.nan
+
+    def __ge__(self, other, debug=None):
+        result = self - other
+        return ~result.s & ~self.nan & ~other.nan
+
+    def __le__(self, other, debug=None):
+        result = other - self
+        return ~result.s & ~self.nan & ~other.nan
+
+    def __eq__(self, other, debug=None):
+        return (
+            (self.s==other.s) & 
+            (self.e==other.e) & 
+            (self.m==other.m)  
+        ) | (
+            (self.e==other.e) & 
+            (self.m==other.m) &
+            (self.m==0)
+        )& ~self.nan & ~other.nan
+
+    def __ne__(self, other, debug=None):
+        return ~(self==other)
+
     def to_int(self, bits=32):
 
         integer = cat(self.m, Constant(bits-self.m_bits, 0))
