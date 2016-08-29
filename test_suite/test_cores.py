@@ -290,9 +290,9 @@ count += len(stimulus_a)
 print count, "vectors passed"
 
 #seed(0)
-for i in xrange(100000):
-    stimulus_a = [randint(0, 1<<32) for i in xrange(1000)]
-    stimulus_b = [randint(0, 1<<32) for i in xrange(1000)]
+for i in xrange(1000000):
+    stimulus_a = [randint(0, 1<<32) for i in xrange(5000)]
+    stimulus_b = [randint(0, 1<<32) for i in xrange(5000)]
     test_binary_cores(stimulus_a, stimulus_b)
-    count += 1000
+    count += 5000
     print count, "vectors passed"
