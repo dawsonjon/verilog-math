@@ -43,6 +43,48 @@ Output(sqrt, 'sqrt_z',
     )
 )
 
+#gt
+gt = Component()
+Output(gt, 'gt_z', 
+    single_to_float(Input(gt, 32, 'gt_a')).__gt__(
+    single_to_float(Input(gt, 32, 'gt_b')), debug=gt)
+)
+
+#lt
+lt = Component()
+Output(lt, 'lt_z', 
+    single_to_float(Input(lt, 32, 'lt_a')).__lt__(
+    single_to_float(Input(lt, 32, 'lt_b')), debug=lt)
+)
+
+#le
+le = Component()
+Output(le, 'le_z', 
+    single_to_float(Input(le, 32, 'le_a')).__le__(
+    single_to_float(Input(le, 32, 'le_b')), debug=le)
+)
+
+#ge
+ge = Component()
+Output(ge, 'ge_z', 
+    single_to_float(Input(ge, 32, 'ge_a')).__ge__(
+    single_to_float(Input(ge, 32, 'ge_b')), debug=ge)
+)
+
+#eq
+eq = Component()
+Output(eq, 'eq_z', 
+    single_to_float(Input(eq, 32, 'eq_a')).__eq__(
+    single_to_float(Input(eq, 32, 'eq_b')), debug=eq)
+)
+
+#ne
+ne = Component()
+Output(ne, 'ne_z', 
+    single_to_float(Input(ne, 32, 'ne_a')).__ne__(
+    single_to_float(Input(ne, 32, 'ne_b')), debug=ne)
+)
+
 #float_to_int
 to_int = Component()
 Output(to_int, 'to_int_z', 
