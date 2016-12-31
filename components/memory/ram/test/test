@@ -1,0 +1,41 @@
+#!/usr/bin/env python
+
+from subprocess import call
+import sys
+import os
+
+fnull = open(os.devnull, 'w')
+
+return_value = call(["c2verilog", "dual_port_ram_tb.c"])
+if return_value != 0:
+    print "compile error"
+    sys.exit(1)
+
+return_value = call(["iverilog", "-o" "dual_port_ram_tb", "main_0.v", "../dual_port_ram.v", "dual_port_ram_tb.v"])
+if return_value != 0:
+    print "compile error"
+    sys.exit(1)
+
+return_value = call(["./dual_port_ram_tb"], stdout=fnull)
+if return_value != 0:
+    print "dual port ram test ... fail"
+    sys.exit(1)
+else:
+    print "dual port ram test ... pass"
+
+return_value = call(["c2verilog", "single_port_ram_tb.c"])
+if return_value != 0:
+    print "compile error"
+    sys.exit(1)
+
+return_value = call(["iverilog",  "-o single_port_ram_tb", "main_0.v", "../single_port_ram.v", "single_port_ram_tb.v"])
+if return_value != 0:
+    print "compile error"
+    sys.exit(1)
+
+return_value = call(["./single_port_ram_tb"], stdout=fnull)
+if return_value != 0:
+    print "single port ram test ... fail"
+    sys.exit(1)
+else:
+    print "single port ram test ... pass"
