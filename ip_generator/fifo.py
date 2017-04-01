@@ -1,8 +1,13 @@
-module fifo (clk, rst, data_in, data_out, data_in_stb, data_in_ack, data_out_stb, data_out_ack);
+def mk_fifo(filename, depth, width):
 
-    parameter width = 8;
-    parameter depth = 1024;
+    of = open(filename, "w")
+    of.write( 
 
+"""module fifo (clk, rst, data_in, data_out, data_in_stb, data_in_ack, data_out_stb, data_out_ack);
+
+    parameter width = %u;
+    parameter depth = %u;
+    parameter address_bits = %u;
 
     input clk;
     input rst;
@@ -15,23 +20,14 @@ module fifo (clk, rst, data_in, data_out, data_in_stb, data_in_ack, data_out_stb
     output data_out_stb;
     input data_out_ack;
 
-    function integer num_bits;
-        input value;
-    begin
-      num_bits = 0; 
-      while (2**num_bits < value) 
-        num_bits = num_bits + 1; 
-      end
-    endfunction 
-
     reg s_output_stb;
     wire s_input_ack;
     wire full;
     wire empty;
     wire read;
     wire write;
-    reg [num_bits(depth)-1:0] a_out;
-    reg [num_bits(depth)-1:0] a_in;
+    reg [address_bits-1:0] a_out;
+    reg [address_bits-1:0] a_in;
     reg [width-1:0] memory [0:depth-1];
 
     always @ (posedge clk) begin
@@ -87,4 +83,5 @@ module fifo (clk, rst, data_in, data_out, data_in_stb, data_in_ack, data_out_stb
     assign read  = (~s_output_stb | output_ack) & ~empty;
 
 
-endmodule
+endmodule"""%(width, depth, int(round(ceil(math.log2(depth)))))
+)
