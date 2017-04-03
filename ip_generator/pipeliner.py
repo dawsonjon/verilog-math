@@ -93,7 +93,7 @@ class Component:
         debug,
         "".join(['    %s_file = $fopen("stim/%s");\n'%(i.iname, i.iname) 
             for i in self.outputs]),
-        "".join(['    %s_file = $fopenr("stim/%s");\n'%(i.iname, i.iname) 
+        "".join(['    %s_file = $fopen("stim/%s", "r");\n'%(i.iname, i.iname) 
             for i in self.inputs]),
         "  end\n\n",
         "  initial\n",

@@ -158,7 +158,7 @@ class Float:
         overflow = s_gt(z_e, Constant(self.e_bits+1, self.e_max))
         z_e = z_e[self.e_bits-1:0]
         z_inf = overflow | a_inf | b_inf
-        z_nan = a_nan | b_nan
+        z_nan = a_nan | b_nan #| (a_inf & (b_m == 0)) | (b_inf & (a_m == 0))
 
 
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
@@ -338,6 +338,17 @@ def single_to_float(a, debug=None):
     m = cat(select(Constant(1, 0), Constant(1, 1), denormal), m)
     return Float(s, e, m, inf, nan, 8, 24)
 
+def double_to_float(a, debug=None):
+    s = a[63]
+    e = a[62:52] - 1023
+    m = a[51:0]
+    inf = (e==Constant(11, 1024)) & (m==Constant(52, 0))
+    nan = (e==Constant(11, 1024)) & (m!=Constant(52, 0))
+    denormal = e==Constant(11, -1023)
+    e = select(Constant(11, -1022), e, denormal)
+    m = cat(select(Constant(1, 0), Constant(1, 1), denormal), m)
+    return Float(s, e, m, inf, nan, 11, 53)
+
 def float_to_single(f):
 
     #normal numbers
@@ -359,6 +370,31 @@ def float_to_single(f):
 
     #nans
     nan = cat(f.s, Constant(31, 0x7fc00000))
+    result = select(nan, result, f.nan)
+
+    return result
+
+def float_to_double(f):
+
+    #normal numbers
+    result = cat(cat(f.s, f.e+1023), f.m[51:0])
+
+    #denormal numbers
+    denormal = (f.e==Constant(11, -1022)) & ~f.m[52]
+    denormal_result = cat(cat(f.s, Constant(11, 0)), f.m[51:0])
+    result = select(denormal_result, result, denormal)
+
+    #zeros
+    zero = cat(f.s, Constant(63, 0))
+    result = select(zero, result, f.m==Constant(53, 0))
+
+    #infs
+    inf = cat(f.s, Constant(63, 0x7ff0000000000000))
+    result = select(inf, result, f.inf)
+
+
+    #nans
+    nan = cat(f.s, Constant(63, 0x7ff8000000000000))
     result = select(nan, result, f.nan)
 
     return result

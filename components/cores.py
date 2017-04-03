@@ -3,6 +3,7 @@ sys.path.append("..")
 
 from ip_generator.pipeliner import Input, Output, Component
 from ip_generator.float import single_to_float, float_to_single, int_to_float
+from ip_generator.float import double_to_float, float_to_double
 import ip_generator.pipeliner
 
 #divider
@@ -100,5 +101,35 @@ Output(to_float, 'to_float_z',
         int_to_float(
             Input(to_float, 32, 'to_float_a')
         )
+    )
+)
+
+#div
+double_div = Component()
+Output(double_div, 'double_div_z', 
+    float_to_double(
+        double_to_float(Input(double_div, 64, 'double_div_a')) 
+        / 
+        double_to_float(Input(double_div, 64, 'double_div_b'))
+    )
+)
+
+#mul
+double_mul = Component()
+Output(double_mul, 'double_mul_z', 
+    float_to_double(
+        double_to_float(Input(double_mul, 64, 'double_mul_a')) 
+        * 
+        double_to_float(Input(double_mul, 64, 'double_mul_b'))
+    )
+)
+
+#add
+double_add = Component()
+Output(double_add, 'double_add_z', 
+    float_to_double(
+        double_to_float(Input(double_add, 64, 'double_add_a')) 
+        + 
+        double_to_float(Input(double_add, 64, 'double_add_b'))
     )
 )

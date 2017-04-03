@@ -12,3 +12,6 @@ gcc -o to_int to_int.c
 gcc -o to_float to_float.c
 gcc -o sqrt sqrt.c -lm
 
+gcc -o double_mul double_mul.c
+gcc -o double_div double_div.c
+gcc -o double_add double_add.c
