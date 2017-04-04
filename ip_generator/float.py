@@ -136,7 +136,10 @@ class Float:
 
         z_s = a_s ^ b_s
         z_e = a_e + b_e + 1
-        z_m = pipelined_mul(a_m, b_m)
+        #z_m = pipelined_mul(a_m, b_m)
+        a_m = resize(a_m, self.m_bits*2)
+        b_m = resize(b_m, self.m_bits*2)
+        z_m = a_m * b_m
         
         #handle underflow
         shift_amount = Constant(z_e.bits, self.e_min) - z_e

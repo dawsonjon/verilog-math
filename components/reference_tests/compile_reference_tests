@@ -15,3 +15,10 @@ gcc -o sqrt sqrt.c -lm
 gcc -o double_mul double_mul.c
 gcc -o double_div double_div.c
 gcc -o double_add double_add.c
+gcc -o double_gt double_gt.c
+gcc -o double_lt double_lt.c
+gcc -o double_ge double_ge.c
+gcc -o double_le double_le.c
+gcc -o double_eq double_eq.c
+gcc -o double_ne double_ne.c
+gcc -o double_sqrt double_sqrt.c -lm
