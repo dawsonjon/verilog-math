@@ -11,13 +11,13 @@ void main(){
     unsigned int a;
     unsigned int b;
 
-    infa = fopen("stim/to_int_a", "r");
-    outf = fopen("stim/to_int_z_expected", "w");
+    infa = fopen("stim/int_to_single_a", "r");
+    outf = fopen("stim/int_to_single_z_expected", "w");
 
     while(1){
         if(fscanf(infa, "%u", &a) == EOF) break;
-        f = *(float*)&a;
-        i = f;
+        f = (float)(int)a;
+        i = *((int*)&f);
         fprintf(outf, "%u\n", i);
     }
 

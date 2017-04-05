@@ -136,10 +136,10 @@ class Float:
 
         z_s = a_s ^ b_s
         z_e = a_e + b_e + 1
-        #z_m = pipelined_mul(a_m, b_m)
-        a_m = resize(a_m, self.m_bits*2)
-        b_m = resize(b_m, self.m_bits*2)
-        z_m = a_m * b_m
+        z_m = pipelined_mul(a_m, b_m)
+        #a_m = resize(a_m, self.m_bits*2)
+        #b_m = resize(b_m, self.m_bits*2)
+        #z_m = a_m * b_m
         
         #handle underflow
         shift_amount = Constant(z_e.bits, self.e_min) - z_e
@@ -329,6 +329,22 @@ def int_to_float(integer, e_bits=8, m_bits=24):
     m, e = fpround(m, e, guard, round_bit, sticky)
     return Float(s, e, m, Constant(1, 0), Constant(1, 0), e_bits, m_bits)
 
+def unsigned_to_float(integer, e_bits=8, m_bits=24):
+    bits = integer.bits
+    integer = Register(integer)
+    lz = leading_zeros(integer)
+    lz = Register(lz)
+    e = Constant(e_bits, integer.bits-1)-lz
+    m = integer << lz
+    m = Register(m)
+    guard = m[bits-m_bits-1]
+    round_bit = m[bits-m_bits-2]
+    sticky = m[bits-m_bits-3:0] != 0
+    sticky = Register(sticky)
+    m = m[bits-1:bits-m_bits]
+    m, e = fpround(m, e, guard, round_bit, sticky)
+    return Float(Constant(1, 0), e, m, Constant(1, 0), Constant(1, 0), e_bits, m_bits)
+
 
 def single_to_float(a, debug=None):
     s = a[31]
@@ -511,9 +527,11 @@ def pipelined_mul(a, b):
             else:
                 z = cat(total[16:0], z)
             total = product + (total >> 17)
+            total = resize(total, total.bits+1)
             total = Register(total)
         else:
             total = product + total
+            total = resize(total, total.bits+1)
             total = Register(total)
         old_lsb = lsb
     z = cat(total[16:0], z)

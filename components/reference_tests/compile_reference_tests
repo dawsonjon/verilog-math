@@ -8,8 +8,9 @@ gcc -o le le.c
 gcc -o ge ge.c
 gcc -o eq eq.c
 gcc -o ne ne.c
-gcc -o to_int to_int.c
-gcc -o to_float to_float.c
+gcc -o single_to_int single_to_int.c
+gcc -o int_to_single int_to_single.c
+gcc -o unsigned_int_to_single unsigned_int_to_single.c
 gcc -o sqrt sqrt.c -lm
 
 gcc -o double_mul double_mul.c

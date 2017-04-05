@@ -180,8 +180,9 @@ def test_cores(stimulus_a, stimulus_b):
         )
 
     converter_cores = {
-        "to_int":cores.to_int, 
-        "to_float":cores.to_float, 
+        "single_to_int":cores.single_to_int, 
+        "int_to_single":cores.int_to_single, 
+        "unsigned_int_to_single":cores.unsigned_int_to_single, 
     }
     for core_name, core in converter_cores.iteritems():
         processes.append(
@@ -258,7 +259,6 @@ stimulus_b = [i[1] for i in permutations([0x80000000, 0x00000000, 0x7f800000, 0x
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
 print count, "vectors passed"
-sys.exit(1)
 
 #edge cases
 stimulus_a = [0x80000000 for i in xrange(1000)]

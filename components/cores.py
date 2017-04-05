@@ -2,8 +2,9 @@ import sys
 sys.path.append("..")
 
 from ip_generator.pipeliner import Input, Output, Component
-from ip_generator.float import single_to_float, float_to_single, int_to_float
+from ip_generator.float import single_to_float, float_to_single
 from ip_generator.float import double_to_float, float_to_double
+import ip_generator.float
 import ip_generator.pipeliner
 
 #divider
@@ -87,19 +88,29 @@ Output(ne, 'ne_z',
 )
 
 #float_to_int
-to_int = Component()
-Output(to_int, 'to_int_z', 
+single_to_int = Component()
+Output(single_to_int, 'single_to_int_z', 
     single_to_float(
-        Input(to_int, 32, 'to_int_a')
+        Input(single_to_int, 32, 'single_to_int_a')
     ).to_int()
 )
 
 #int_to_float
-to_float = Component()
-Output(to_float, 'to_float_z', 
+int_to_single = Component()
+Output(int_to_single, 'int_to_single_z', 
     float_to_single(
-        int_to_float(
-            Input(to_float, 32, 'to_float_a')
+        ip_generator.float.int_to_float(
+            Input(int_to_single, 32, 'int_to_single_a')
+        )
+    )
+)
+
+#unsigned_to_float
+unsigned_int_to_single = Component()
+Output(unsigned_int_to_single, 'unsigned_int_to_single_z', 
+    float_to_single(
+        ip_generator.float.unsigned_to_float(
+            Input(unsigned_int_to_single, 32, 'unsigned_int_to_single_a')
         )
     )
 )
@@ -184,20 +195,3 @@ Output(double_ne, 'double_ne_z',
     double_to_float(Input(double_ne, 64, 'double_ne_b')), debug=double_ne)
 )
 
-#float_to_int
-double_to_int = Component()
-Output(double_to_int, 'double_to_int_z', 
-    double_to_float(
-        Input(double_to_int, 64, 'double_to_int_a')
-    ).to_int()
-)
-
-#int_to_float
-double_to_float = Component()
-Output(double_to_float, 'double_to_float_z', 
-    float_to_double(
-        int_to_float(
-            Input(double_to_float, 64, 'double_to_float_a')
-        )
-    )
-)
