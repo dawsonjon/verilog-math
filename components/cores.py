@@ -37,6 +37,24 @@ Output(add, 'add_z',
     )
 )
 
+#max
+single_max = Component()
+Output(single_max, 'single_max_z', 
+    float_to_single(
+        single_to_float(Input(single_max, 32, 'single_max_a')).max(
+        single_to_float(Input(single_max, 32, 'single_max_b')))
+    )
+)
+
+#min
+single_min = Component()
+Output(single_min, 'single_min_z', 
+    float_to_single(
+        single_to_float(Input(single_min, 32, 'single_min_a')).min(
+        single_to_float(Input(single_min, 32, 'single_min_b')))
+    )
+)
+
 #sqrt
 sqrt = Component()
 Output(sqrt, 'sqrt_z', 
@@ -150,6 +168,24 @@ Output(double_add, 'double_add_z',
         double_to_float(Input(double_add, 64, 'double_add_a')) 
         + 
         double_to_float(Input(double_add, 64, 'double_add_b'))
+    )
+)
+
+#max
+double_max = Component()
+Output(double_max, 'double_max_z', 
+    float_to_double(
+        double_to_float(Input(double_max, 64, 'double_max_a')).max(
+        double_to_float(Input(double_max, 64, 'double_max_b')))
+    )
+)
+
+#min
+double_min = Component()
+Output(double_min, 'double_min_z', 
+    float_to_double(
+        double_to_float(Input(double_min, 64, 'double_min_a')).min(
+        double_to_float(Input(double_min, 64, 'double_min_b')))
     )
 )
 

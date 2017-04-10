@@ -2,6 +2,8 @@
 gcc -o add add.c
 gcc -o mul mul.c
 gcc -o div div.c
+gcc -o single_max single_max.c -lm
+gcc -o single_min single_min.c -lm
 gcc -o gt gt.c
 gcc -o lt lt.c
 gcc -o le le.c
@@ -17,6 +19,8 @@ gcc -o sqrt sqrt.c -lm
 gcc -o double_mul double_mul.c
 gcc -o double_div double_div.c
 gcc -o double_add double_add.c
+gcc -o double_max double_max.c -lm
+gcc -o double_min double_min.c -lm
 gcc -o double_gt double_gt.c
 gcc -o double_lt double_lt.c
 gcc -o double_ge double_ge.c

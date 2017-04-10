@@ -169,6 +169,10 @@ def test_binary(core_name, core, a, b):
              result = True
         if not result:
             print "%08x %08x %08x %08x fail"%(a, b, i, j)
+            print "a:", asfloat(a)
+            print "b:", asfloat(b)
+            print "actual", asfloat(i)
+            print "actual", asfloat(j)
             print n
             trace(response, n)
             #append failures to regression test file
@@ -182,7 +186,9 @@ def test_cores(stimulus_a, stimulus_b):
     binary_cores = {
         "mul":cores.mul, 
         "div":cores.div, 
-        "add":cores.add
+        "add":cores.add,
+        "single_max":cores.single_max,
+        "single_min":cores.single_min
     }
     processes = []
     for core_name, core in binary_cores.iteritems():

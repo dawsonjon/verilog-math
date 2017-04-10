@@ -183,6 +183,8 @@ def test_cores(stimulus_a, stimulus_b):
         "double_mul":cores.double_mul, 
         "double_add":cores.double_add, 
         "double_div":cores.double_div, 
+        "double_max":cores.double_max, 
+        "double_min":cores.double_min, 
     }
     processes = []
     for core_name, core in binary_cores.iteritems():

@@ -283,6 +283,24 @@ class Float:
     def __ne__(self, other, debug=None):
         return ~(self==other)
 
+    def max(self, other):
+        ge = self >= other
+        s = select(self.s, other.s, ge)
+        e = select(self.e, other.e, ge)
+        m = select(self.m, other.m, ge)
+        inf = select(self.inf, other.inf, ge)
+        nan = self.nan | other.nan
+        return Float(s, e, m, inf, nan, self.e_bits, self.m_bits)
+
+    def min(self, other):
+        lt = self < other
+        s = select(self.s, other.s, lt)
+        e = select(self.e, other.e, lt)
+        m = select(self.m, other.m, lt)
+        inf = select(self.inf, other.inf, lt)
+        nan = self.nan | other.nan
+        return Float(s, e, m, inf, nan, self.e_bits, self.m_bits)
+
     def to_int(self, bits=32):
 
         integer = cat(self.m, Constant(bits-self.m_bits, 0))
