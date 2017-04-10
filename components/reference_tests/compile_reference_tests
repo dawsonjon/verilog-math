@@ -9,6 +9,7 @@ gcc -o ge ge.c
 gcc -o eq eq.c
 gcc -o ne ne.c
 gcc -o single_to_int single_to_int.c
+gcc -o single_to_unsigned_int single_to_unsigned_int.c
 gcc -o int_to_single int_to_single.c
 gcc -o unsigned_int_to_single unsigned_int_to_single.c
 gcc -o sqrt sqrt.c -lm
@@ -23,3 +24,4 @@ gcc -o double_le double_le.c
 gcc -o double_eq double_eq.c
 gcc -o double_ne double_ne.c
 gcc -o double_sqrt double_sqrt.c -lm
+gcc -o double_to_int double_to_int.c

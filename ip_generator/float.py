@@ -289,16 +289,17 @@ class Float:
         integer >>= Constant(self.e_bits, bits)-self.e-1
         integer = Register(integer)
 
-        overflow = s_ge(self.e, Constant(self.e_bits, bits-1)) 
-        overflow |= self.inf
-        overflow |= self.nan
-        underflow = s_lt(self.e, 0) | (self.m==0)
-
         negative_integer = Register(-integer)
         integer = select(negative_integer, integer, self.s)
-        integer = select(Constant(bits, 0), integer, underflow)
-        integer = select(Constant(bits, 1<<(bits-1)), integer, overflow)
         Register(integer)
+
+        return integer
+
+    def to_unsigned(self, bits=32):
+
+        integer = cat(self.m, Constant(bits-self.m_bits, 0))
+        integer >>= Constant(self.e_bits, bits)-self.e-1
+        integer = Register(integer)
 
         return integer
 

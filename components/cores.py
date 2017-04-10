@@ -95,6 +95,14 @@ Output(single_to_int, 'single_to_int_z',
     ).to_int()
 )
 
+#float_to_unsigned
+single_to_unsigned_int = Component()
+Output(single_to_unsigned_int, 'single_to_unsigned_int_z', 
+    single_to_float(
+        Input(single_to_unsigned_int, 32, 'single_to_unsigned_int_a')
+    ).to_unsigned()
+)
+
 #int_to_float
 int_to_single = Component()
 Output(int_to_single, 'int_to_single_z', 
@@ -195,3 +203,38 @@ Output(double_ne, 'double_ne_z',
     double_to_float(Input(double_ne, 64, 'double_ne_b')), debug=double_ne)
 )
 
+#float_to_int
+double_to_int = Component()
+Output(double_to_int, 'double_to_int_z', 
+    double_to_float(
+        Input(double_to_int, 64, 'double_to_int_a')
+    ).to_int(64)
+)
+
+#float_to_unsigned
+double_to_unsigned_int = Component()
+Output(double_to_unsigned_int, 'double_to_unsigned_int_z', 
+    double_to_float(
+        Input(double_to_unsigned_int, 64, 'double_to_unsigned_int_a')
+    ).to_unsigned(64)
+)
+
+#int_to_float
+int_to_double = Component()
+Output(int_to_double, 'int_to_double_z', 
+    float_to_double(
+        ip_generator.float.int_to_float(
+            Input(int_to_double, 64, 'int_to_double_a'), 11, 53
+        )
+    )
+)
+
+#unsigned_to_float
+unsigned_int_to_double = Component()
+Output(unsigned_int_to_double, 'unsigned_int_to_double_z', 
+    float_to_double(
+        ip_generator.float.unsigned_to_float(
+            Input(unsigned_int_to_double, 32, 'unsigned_int_to_double_a'), 11, 53
+        )
+    )
+)

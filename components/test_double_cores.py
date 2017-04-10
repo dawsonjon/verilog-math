@@ -181,17 +181,17 @@ def test_cores(stimulus_a, stimulus_b):
             )
         )
 
-    #converter_cores = {
-    #    "to_int":cores.to_int, 
-    #    "to_float":cores.to_float, 
-    #}
-    #for core_name, core in converter_cores.iteritems():
-    #    processes.append(
-    #        Process(
-    #            target = test_convert,
-    #            args=[core_name, core, stimulus_a]
-    #        )
-    #    )
+    converter_cores = {
+        "double_to_int":cores.to_int, 
+        #"to_float":cores.to_float, 
+    }
+    for core_name, core in converter_cores.iteritems():
+        processes.append(
+            Process(
+                target = test_convert,
+                args=[core_name, core, stimulus_a]
+            )
+        )
 
     unary_cores = {
         "double_sqrt":cores.double_sqrt, 
