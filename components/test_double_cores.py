@@ -9,6 +9,7 @@ from numpy import float32
 from itertools import permutations
 from random import randint
 from multiprocessing import Process
+from math import isnan
 
 def trace(response, n):
     for name, values in response.iteritems():
@@ -47,10 +48,21 @@ def test_convert(core_name, core, a):
 
     n = 0
     for a, i, j in zip(a, actual, expected):
-        if(j != i):
-            result = False
-        else:
+        if asdouble(a) < 0 and "to_unsigned" in core_name:
             result = True
+        elif asdouble(a) > (2**64)-1 and "to_unsigned" in core_name:
+            result = True
+        elif asdouble(a) > (2**63)-1 and "to_int" in core_name:
+            result = True
+        elif asdouble(a) < -(2**63) and "to_int" in core_name:
+            result = True
+        elif isnan(asdouble(a)):
+            result = True
+        else:
+            if(j != i):
+                result = False
+            else:
+                result = True
         if not result:
             trace(response, n)
             print "%08x %08x %08x fail"%(a, i, j)
@@ -182,8 +194,10 @@ def test_cores(stimulus_a, stimulus_b):
         )
 
     converter_cores = {
-        "double_to_int":cores.to_int, 
-        #"to_float":cores.to_float, 
+        "double_to_int":cores.double_to_int, 
+        "double_to_unsigned_int":cores.double_to_unsigned_int, 
+        "int_to_double":cores.int_to_double, 
+        "unsigned_int_to_double":cores.unsigned_int_to_double, 
     }
     for core_name, core in converter_cores.iteritems():
         processes.append(

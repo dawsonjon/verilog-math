@@ -234,7 +234,7 @@ unsigned_int_to_double = Component()
 Output(unsigned_int_to_double, 'unsigned_int_to_double_z', 
     float_to_double(
         ip_generator.float.unsigned_to_float(
-            Input(unsigned_int_to_double, 32, 'unsigned_int_to_double_a'), 11, 53
+            Input(unsigned_int_to_double, 64, 'unsigned_int_to_double_a'), 11, 53
         )
     )
 )

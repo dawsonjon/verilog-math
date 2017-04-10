@@ -48,13 +48,13 @@ def test_convert(core_name, core, a):
 
     n = 0
     for a, i, j in zip(a, actual, expected):
-        if asfloat(a) < 0 and "unsigned" in core_name:
+        if asfloat(a) < 0 and "to_unsigned" in core_name:
             result = True
-        elif asfloat(a) > (2**32)-1 and "unsigned" in core_name:
+        elif asfloat(a) > (2**32)-1 and "to_unsigned" in core_name:
             result = True
-        elif asfloat(a) > (2**31)-1:
+        elif asfloat(a) > (2**31)-1 and "to_int" in core_name:
             result = True
-        elif asfloat(a) < -(2**31):
+        elif asfloat(a) < -(2**31) and "to_int" in core_name:
             result = True
         elif isnan(asfloat(a)):
             result = True
