@@ -301,6 +301,12 @@ class Float:
         nan = self.nan | other.nan
         return Float(s, e, m, inf, nan, self.e_bits, self.m_bits)
 
+    def abs(self):
+        return Float(Constant(1, 0), self.e, self.m, self.inf, self.nan, self.e_bits, self.m_bits)
+
+    def neg(self):
+        return Float(~self.s, self.e, self.m, self.inf, self.nan, self.e_bits, self.m_bits)
+
     def to_int(self, bits=32):
 
         integer = cat(self.m, Constant(bits-self.m_bits, 0))

@@ -59,7 +59,21 @@ Output(single_min, 'single_min_z',
 sqrt = Component()
 Output(sqrt, 'sqrt_z', 
     float_to_single(
-        single_to_float(Input(sqrt, 32, 'sqrt_a'), debug=sqrt).sqrt(debug=sqrt)
+        single_to_float(Input(sqrt, 32, 'sqrt_a')).sqrt(debug=sqrt)
+    )
+)
+
+abs = Component()
+Output(abs, 'abs_z', 
+    float_to_single(
+        single_to_float(Input(abs, 32, 'abs_a')).abs()
+    )
+)
+
+neg = Component()
+Output(neg, 'neg_z', 
+    float_to_single(
+        single_to_float(Input(neg, 32, 'neg_a')).neg()
     )
 )
 
@@ -194,6 +208,20 @@ double_sqrt = Component()
 Output(double_sqrt, 'double_sqrt_z', 
     float_to_double(
         double_to_float(Input(double_sqrt, 64, 'double_sqrt_a'), debug=double_sqrt).sqrt(debug=double_sqrt)
+    )
+)
+
+double_abs = Component()
+Output(double_abs, 'double_abs_z', 
+    float_to_double(
+        double_to_float(Input(double_abs, 64, 'double_abs_a')).abs()
+    )
+)
+
+double_neg = Component()
+Output(double_neg, 'double_neg_z', 
+    float_to_double(
+        double_to_float(Input(double_neg, 64, 'double_neg_a')).neg()
     )
 )
 
