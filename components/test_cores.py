@@ -217,6 +217,7 @@ def test_cores(stimulus_a, stimulus_b):
         "sqrt":cores.sqrt, 
         "abs":cores.abs, 
         "neg":cores.neg, 
+        "trunc":cores.trunc, 
     }
     for core_name, core in unary_cores.iteritems():
         processes.append(

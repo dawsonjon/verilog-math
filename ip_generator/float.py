@@ -283,6 +283,24 @@ class Float:
     def __ne__(self, other, debug=None):
         return ~(self==other)
 
+    def trunc(self, debug=None):
+        s = self.s
+        e = self.e
+        m = self.m
+
+        big_number = s_ge(e, Constant(self.e_bits, self.m_bits))
+        less_than_one = s_lt(e, Constant(self.e_bits, 0))
+
+        fraction_bits = Constant(self.e_bits,self.m_bits-1)-e
+        fraction_bits = select(Constant(self.e_bits, 0), fraction_bits, big_number)
+
+        m &= Constant(self.m_bits, -1) << fraction_bits
+        m = select(Constant(self.m_bits, 0), m, less_than_one)
+
+        inf = self.inf
+        nan = self.nan
+        return Float(s, e, m, inf, nan, self.e_bits, self.m_bits)
+
     def max(self, other):
         ge = self >= other
         s = select(self.s, other.s, ge)

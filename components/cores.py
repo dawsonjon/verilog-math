@@ -77,6 +77,13 @@ Output(neg, 'neg_z',
     )
 )
 
+trunc = Component()
+Output(trunc, 'trunc_z', 
+    float_to_single(
+        single_to_float(Input(trunc, 32, 'trunc_a')).trunc(debug=trunc)
+    )
+)
+
 #gt
 gt = Component()
 Output(gt, 'gt_z', 
@@ -222,6 +229,13 @@ double_neg = Component()
 Output(double_neg, 'double_neg_z', 
     float_to_double(
         double_to_float(Input(double_neg, 64, 'double_neg_a')).neg()
+    )
+)
+
+double_trunc = Component()
+Output(double_trunc, 'double_trunc_z', 
+    float_to_double(
+        double_to_float(Input(double_trunc, 64, 'double_trunc_a')).trunc(debug=trunc)
     )
 )
 
