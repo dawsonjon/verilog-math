@@ -214,6 +214,8 @@ def test_cores(stimulus_a, stimulus_b):
         "double_abs":cores.double_abs, 
         "double_neg":cores.double_neg, 
         "double_trunc":cores.double_trunc, 
+        "double_ceil":cores.double_ceil, 
+        "double_floor":cores.double_floor, 
     }
     for core_name, core in unary_cores.iteritems():
         processes.append(

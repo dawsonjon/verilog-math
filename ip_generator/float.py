@@ -3,6 +3,16 @@ from math import log, floor, ceil
 import pipeliner
 from pipeliner import *
 
+def fselect(t, f, sel):
+    assert t.e_bits == f.e_bits
+    assert t.m_bits == f.m_bits
+    s = select(t.s, f.s, sel)
+    e = select(t.e, f.e, sel)
+    m = select(t.m, f.m, sel)
+    inf = select(t.inf, f.inf, sel)
+    nan = select(t.nan, f.nan, sel)
+    return Float(s, e, m, inf, nan, t.e_bits, t.m_bits)
+
 class Float:
     def __init__(self, sign, exponent, mantissa, inf, nan, ebits=8, mbits=24):
         self.s = sign
@@ -244,13 +254,14 @@ class Float:
         overflow = s_gt(z_e, Constant(self.e_bits, self.e_max))
         z_e = z_e[self.e_bits-1:0]
         z_inf = overflow | a_inf | b_inf
+        z_s = select(larger_s, z_s, z_inf)
         z_nan = a_nan | b_nan | (a_inf & b_inf)
         
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
 
     def __sub__(self, other):
         f = other
-        f = Float(~f.s, f.e, f.m, f.inf, f.e_bits, f.m_bits)
+        f = Float(~f.s, f.e, f.m, f.inf, f.nan, f.e_bits, f.m_bits)
         return self + f
 
     def __gt__(self, other, debug=None):
@@ -301,6 +312,24 @@ class Float:
         nan = self.nan
         return Float(s, e, m, inf, nan, self.e_bits, self.m_bits)
 
+    def ceil(self, debug=None):
+        integer_part = self.trunc()
+        exact = integer_part == self
+        result = fselect(integer_part, integer_part + FPConstant(self.e_bits, self.m_bits, 1), self.s)
+        result = fselect(self, result, exact)
+        return result
+
+    def floor(self, debug=None):
+        integer_part = self.trunc()
+        exact = integer_part == self
+        result = fselect(FPConstant(self.e_bits, self.m_bits, -1)+integer_part, integer_part, self.s)
+        Output(debug, 'resultsign', result.s)
+        Output(debug, 'resultm', result.m)
+        result = fselect(self, result, exact)
+        Output(debug, 'integer_partinf', integer_part.inf)
+        Output(debug, 'integer_partsign', integer_part.s)
+        return result
+
     def max(self, other):
         ge = self >= other
         s = select(self.s, other.s, ge)
@@ -346,13 +375,14 @@ class Float:
         return integer
 
 class FPConstant(Float):
-    def __init__(self, ebits, mbits, value):
+    def __init__(self, e_bits, m_bits, value):
         s = 1 if float(value) < 0 else 0
         value = abs(float(value))
         e = int(floor(log(value, 2)))
         m = value/(2**e)
-        m *= (2**(mbits-1))
+        m *= (2**(m_bits-1))
         m = int(round(m))
+        Float.__init__(self, Constant(1, s), Constant(e_bits, e), Constant(m_bits, m), Constant(1, 0), Constant(1, 0), e_bits, m_bits)
 
 def int_to_float(integer, e_bits=8, m_bits=24):
     bits = integer.bits

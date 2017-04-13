@@ -18,6 +18,8 @@ gcc -o sqrt sqrt.c -lm
 gcc -o abs abs.c -lm
 gcc -o neg neg.c -lm
 gcc -o trunc trunc.c -lm
+gcc -o ceil ceil.c -lm
+gcc -o floor floor.c -lm
 
 gcc -o double_mul double_mul.c
 gcc -o double_div double_div.c
@@ -38,3 +40,5 @@ gcc -o double_to_unsigned_int double_to_unsigned_int.c
 gcc -o int_to_double int_to_double.c
 gcc -o unsigned_int_to_double unsigned_int_to_double.c
 gcc -o double_trunc double_trunc.c -lm
+gcc -o double_ceil double_ceil.c -lm
+gcc -o double_floor double_floor.c -lm

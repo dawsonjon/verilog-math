@@ -84,6 +84,20 @@ Output(trunc, 'trunc_z',
     )
 )
 
+ceil = Component()
+Output(ceil, 'ceil_z', 
+    float_to_single(
+        single_to_float(Input(ceil, 32, 'ceil_a')).ceil(debug=ceil)
+    )
+)
+
+floor = Component()
+Output(floor, 'floor_z', 
+    float_to_single(
+        single_to_float(Input(floor, 32, 'floor_a')).floor(debug=floor)
+    )
+)
+
 #gt
 gt = Component()
 Output(gt, 'gt_z', 
@@ -235,7 +249,21 @@ Output(double_neg, 'double_neg_z',
 double_trunc = Component()
 Output(double_trunc, 'double_trunc_z', 
     float_to_double(
-        double_to_float(Input(double_trunc, 64, 'double_trunc_a')).trunc(debug=trunc)
+        double_to_float(Input(double_trunc, 64, 'double_trunc_a')).trunc(debug=double_trunc)
+    )
+)
+
+double_ceil = Component()
+Output(double_ceil, 'double_ceil_z', 
+    float_to_double(
+        double_to_float(Input(double_ceil, 64, 'double_ceil_a')).ceil(debug=double_ceil)
+    )
+)
+
+double_floor = Component()
+Output(double_floor, 'double_floor_z', 
+    float_to_double(
+        double_to_float(Input(double_floor, 64, 'double_floor_a')).floor(debug=double_floor)
     )
 )
 

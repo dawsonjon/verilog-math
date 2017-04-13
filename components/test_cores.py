@@ -218,6 +218,8 @@ def test_cores(stimulus_a, stimulus_b):
         "abs":cores.abs, 
         "neg":cores.neg, 
         "trunc":cores.trunc, 
+        "ceil":cores.ceil, 
+        "floor":cores.floor, 
     }
     for core_name, core in unary_cores.iteritems():
         processes.append(
