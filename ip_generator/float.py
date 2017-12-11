@@ -126,7 +126,7 @@ class Float:
         #handle divide by inf
         z_m = select(0, z_m, b_inf)
         z_inf = select(0, z_inf, b_inf)
-        z_nan = z_nan | (a_inf & b_inf)
+        z_nan = a_nan | b_nan | (a_inf & b_inf) | ((a_m == 0) & (b_m == 0))
 
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
 
@@ -147,9 +147,6 @@ class Float:
         z_s = a_s ^ b_s
         z_e = a_e + b_e + 1
         z_m = pipelined_mul(a_m, b_m)
-        #a_m = resize(a_m, self.m_bits*2)
-        #b_m = resize(b_m, self.m_bits*2)
-        #z_m = a_m * b_m
         
         #handle underflow
         shift_amount = Constant(z_e.bits, self.e_min) - z_e
@@ -171,7 +168,7 @@ class Float:
         overflow = s_gt(z_e, Constant(self.e_bits+1, self.e_max))
         z_e = z_e[self.e_bits-1:0]
         z_inf = overflow | a_inf | b_inf
-        z_nan = a_nan | b_nan #| (a_inf & (b_m == 0)) | (b_inf & (a_m == 0))
+        z_nan = a_nan | b_nan | (a_inf & (b_m == 0)) | (b_inf & (a_m == 0))
 
 
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
@@ -234,7 +231,7 @@ class Float:
         #has occurred. If it hasn't the msb of the result will be zero
         #and the exponent will be reduced again accordingly.
         z_m = larger_m + smaller_m
-        z_s = select(0, larger_s, Register(z_m) == 0)
+        z_s = select(a_s & b_s, larger_s, Register(z_m) == 0)
         z_e = larger_e + 1 
         z_m = Register(z_m)
         z_e = Register(z_e)
@@ -255,7 +252,7 @@ class Float:
         z_e = z_e[self.e_bits-1:0]
         z_inf = overflow | a_inf | b_inf
         z_s = select(larger_s, z_s, z_inf)
-        z_nan = a_nan | b_nan | (a_inf & b_inf)
+        z_nan = a_nan | b_nan | (a_inf & b_inf & (a_s ^ b_s))
         
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
 
@@ -266,30 +263,31 @@ class Float:
 
     def __gt__(self, other, debug=None):
         result = other - self
-        return result.s & ~self.nan & ~other.nan
+        return (result.m != 0) & result.s & ~self.nan & ~other.nan
 
     def __lt__(self, other, debug=None):
         result = self - other
-        return result.s & ~self.nan & ~other.nan
+        return (result.m != 0) & result.s & ~self.nan & ~other.nan
 
     def __ge__(self, other, debug=None):
         result = self - other
-        return ~result.s & ~self.nan & ~other.nan
+        return ((result.m == 0) | ~result.s) & ~self.nan & ~other.nan
 
     def __le__(self, other, debug=None):
         result = other - self
-        return ~result.s & ~self.nan & ~other.nan
+        return ((result.m == 0) | ~result.s) & ~self.nan & ~other.nan
 
     def __eq__(self, other, debug=None):
-        return (
+        return ((
             (self.s==other.s) & 
             (self.e==other.e) & 
             (self.m==other.m)  
         ) | (
-            (self.e==other.e) & 
-            (self.m==other.m) &
-            (self.m==0)
-        )& ~self.nan & ~other.nan
+            #(self.e==0) & 
+            #(other.e==0) & 
+            (self.m==0) &
+            (other.m==0)
+        )) & ~(self.nan | other.nan)
 
     def __ne__(self, other, debug=None):
         return ~(self==other)

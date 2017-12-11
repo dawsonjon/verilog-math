@@ -6,7 +6,7 @@ import random
 import cores
 import struct
 from numpy import float32
-from itertools import permutations
+from itertools import product
 from random import randint
 from multiprocessing import Process
 from math import isnan
@@ -14,6 +14,35 @@ from math import isnan
 def trace(response, n):
     for name, values in response.iteritems():
         print name, values[n]
+
+def get_mantissa(x):
+    return x & 0x000fffffffffffff
+
+def get_exponent(x):
+    return ((x & 0x7ff0000000000000) >> 52) - 1023
+
+def get_sign(x):
+    return ((x & 0x8000000000000000) >> 63)
+
+def is_nan(x):
+    return get_exponent(x) == 1024 and get_mantissa(x) != 0
+
+def is_inf(x):
+    return get_exponent(x) == 1024 and get_mantissa(x) == 0
+
+def is_pos_inf(x):
+    return is_inf(x) and not get_sign(x)
+
+def is_neg_inf(x):
+    return is_inf(x) and get_sign(x)
+
+def match(x, y):
+    return (
+        (is_pos_inf(x) and is_pos_inf(y)) or
+        (is_neg_inf(x) and is_neg_inf(y)) or
+        (is_nan(x) and is_nan(y)) or
+        (x == y)
+        )
 
 def asdouble(x):
     string = ""
@@ -81,23 +110,7 @@ def test_unary(core_name, core, a, b):
 
     n = 0
     for a, b, i, j in zip(a, b, actual, expected):
-        if(j != i):
-            j_mantissa = j & 0xfffffffffffff
-            j_exponent = ((j & 0x7ff0000000000000) >> 52) - 1023
-            j_sign = ((j & 0x8000000000000000) >> 63)
-            i_mantissa = i & 0xfffffffffffff
-            i_exponent = ((i & 0x7ff0000000000000) >> 52) - 1023
-            i_sign = ((i & 0x8000000000000000) >> 63)
-
-            if j_exponent == 1024 and j_mantissa != 0:
-                if(i_exponent == 1024):
-                    result = True
-                else:
-                    result = False
-            else:
-                result = False
-        else:
-             result = True
+        result = match(i, j)
         if not result:
             failure(a, b, i, j)
             print "failed in vector", n
@@ -150,23 +163,7 @@ def test_binary(core_name, core, a, b):
 
     n = 0
     for a, b, i, j in zip(a, b, actual, expected):
-        if(j != i):
-            j_mantissa = j & 0xfffffffffffff
-            j_exponent = ((j & 0x7ff0000000000000) >> 52) - 1023
-            j_sign = ((j & 0x8000000000000000) >> 63)
-            i_mantissa = i & 0xfffffffffffff
-            i_exponent = ((i & 0x7ff0000000000000) >> 52) - 1023
-            i_sign = ((i & 0x8000000000000000) >> 63)
-
-            if j_exponent == 1024 and j_mantissa != 0:
-                if(i_exponent == 1024):
-                    result = True
-                else:
-                    result = False
-            else:
-                result = False
-        else:
-             result = True
+        result = match(j, i)
         if not result:
             failure(a, b, i, j)
             print "failed in vector", n
@@ -270,12 +267,11 @@ print count, "vectors passed"
 
 #corner cases
 from itertools import permutations
-stimulus_a = [i[0] for i in permutations(
-    [0x8000000000000000, 0x0000000000000000, 0x7ff0000000000000, 
-     0xfff0000000000000, 0x7ff8000000000000, 0xfff8000000000000], 2)]
-stimulus_b = [i[1] for i in permutations(
-    [0x8000000000000000, 0x0000000000000000, 0x7ff0000000000000, 
-     0xfff0000000000000, 0x7ff8000000000000, 0xfff8000000000000], 2)]
+special_values = [0x8000000000000000, 0x0000000000000000, 0x7ff0000000000000, 
+     0xfff0000000000000, 0x7ff8000000000000, 0xfff8000000000000]
+vectors = list(product(special_values, special_values))
+stimulus_a = [a for a, b in vectors]
+stimulus_b = [b for a, b in vectors]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
 print count, "vectors passed"

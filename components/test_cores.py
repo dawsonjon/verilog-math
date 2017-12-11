@@ -6,7 +6,7 @@ import random
 import cores
 import struct
 from numpy import float32
-from itertools import permutations
+from itertools import product
 from random import randint
 from multiprocessing import Process
 from math import isnan, isinf
@@ -37,6 +37,35 @@ def get_expected(core_name):
     subprocess.call("./reference_tests/"+core_name)
     inf = open("stim/%s_z_expected"%core_name)
     return [int(i) for i in inf]
+
+def get_mantissa(x):
+    return 0x7fffff & x
+
+def get_exponent(x):
+    return ((x & 0x7f800000) >> 23) - 127
+
+def get_sign(x):
+    return ((x & 0x80000000) >> 31)
+
+def is_nan(x):
+    return get_exponent(x) == 128 and get_mantissa(x) != 0
+
+def is_inf(x):
+    return get_exponent(x) == 128 and get_mantissa(x) == 0
+
+def is_pos_inf(x):
+    return is_inf(x) and not get_sign(x)
+
+def is_neg_inf(x):
+    return is_inf(x) and get_sign(x)
+
+def match(x, y):
+    return (
+        (is_pos_inf(x) and is_pos_inf(y)) or
+        (is_neg_inf(x) and is_neg_inf(y)) or
+        (is_nan(x) and is_nan(y)) or
+        (x == y)
+        )
 
 def test_convert(core_name, core, a):
     print "testing", core_name, "..."
@@ -83,22 +112,7 @@ def test_unary(core_name, core, a, b):
 
     n = 0
     for a, b, i, j in zip(a, b, actual, expected):
-        if(j != i):
-            j_mantissa = j & 0x7fffff
-            j_exponent = ((j & 0x7f800000) >> 23) - 127
-            j_sign = ((j & 0x80000000) >> 31)
-            i_mantissa = i & 0x7fffff
-            i_exponent = ((i & 0x7f800000) >> 23) - 127
-            i_sign = ((i & 0x80000000) >> 31)
-            if j_exponent == 128 and j_mantissa != 0:
-                if(i_exponent == 128):
-                    result = True
-                else:
-                    result = False
-            else:
-                result = False
-        else:
-             result = True
+        result = match(i, j)
         if not result:
             failure(a, b, i, j)
             print "failed in vector", n
@@ -151,28 +165,13 @@ def test_binary(core_name, core, a, b):
 
     n = 0
     for a, b, i, j in zip(a, b, actual, expected):
-        if(j != i):
-            j_mantissa = j & 0x7fffff
-            j_exponent = ((j & 0x7f800000) >> 23) - 127
-            j_sign = ((j & 0x80000000) >> 31)
-            i_mantissa = i & 0x7fffff
-            i_exponent = ((i & 0x7f800000) >> 23) - 127
-            i_sign = ((i & 0x80000000) >> 31)
-            if j_exponent == 128 and j_mantissa != 0:
-                if(i_exponent == 128):
-                    result = True
-                else:
-                    result = False
-            else:
-                result = False
-        else:
-             result = True
+        result = match(i, j)
         if not result:
             print "%08x %08x %08x %08x fail"%(a, b, i, j)
             print "a:", asfloat(a)
             print "b:", asfloat(b)
             print "actual", asfloat(i)
-            print "actual", asfloat(j)
+            print "expected", asfloat(j)
             print n
             trace(response, n)
             #append failures to regression test file
@@ -279,9 +278,10 @@ count += len(stimulus_a)
 print count, "vectors passed"
 
 #corner cases
-from itertools import permutations
-stimulus_a = [i[0] for i in permutations([0x80000000, 0x00000000, 0x7f800000, 0xff800000, 0x7fc00000, 0xffc00000], 2)]
-stimulus_b = [i[1] for i in permutations([0x80000000, 0x00000000, 0x7f800000, 0xff800000, 0x7fc00000, 0xffc00000], 2)]
+special_values = [0x80000000, 0x00000000, 0x7f800000, 0xff800000, 0x7fc00000, 0xffc00000]
+vectors = list(product(special_values, special_values))
+stimulus_a = [a for a, b in vectors]
+stimulus_b = [b for a, b in vectors]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
 print count, "vectors passed"
