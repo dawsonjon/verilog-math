@@ -130,7 +130,7 @@ class Float:
 
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
 
-    def __mul__(self, other):
+    def __mul__(self, other, debug=None):
 
         #add a bit to e so that we can test for overflow
         a_e = s_resize(self.e, self.e_bits+2)
@@ -151,16 +151,17 @@ class Float:
         #handle underflow
         shift_amount = Constant(z_e.bits, self.e_min) - z_e
         shift_amount = select(0, shift_amount, shift_amount[z_e.bits-1])
-        z_m = z_m >> shift_amount
+        z_m, carry = lshift_with_carry(z_m, shift_amount)
         z_e += shift_amount
         z_m = Register(z_m)
         z_e = Register(z_e)
+        s = carry != 0
 
         z_m, z_e = normalise(z_m, z_e, self.e_min)
 
         g = z_m[self.m_bits-1]
         r = z_m[self.m_bits-2]
-        s = z_m[self.m_bits-3:0] != Constant(self.m_bits, 0)
+        s = (z_m[self.m_bits-3:0] != Constant(self.m_bits, 0)) | s
         s = Register(s)
         z_m = z_m[self.m_bits*2-1:self.m_bits]
         z_m, z_e = fpround(z_m, z_e, g, r, s)
@@ -321,11 +322,11 @@ class Float:
         integer_part = self.trunc()
         exact = integer_part == self
         result = fselect(FPConstant(self.e_bits, self.m_bits, -1)+integer_part, integer_part, self.s)
-        Output(debug, 'resultsign', result.s)
-        Output(debug, 'resultm', result.m)
+        #Output(debug, 'resultsign', result.s)
+        #Output(debug, 'resultm', result.m)
         result = fselect(self, result, exact)
-        Output(debug, 'integer_partinf', integer_part.inf)
-        Output(debug, 'integer_partsign', integer_part.s)
+        #Output(debug, 'integer_partinf', integer_part.inf)
+        #Output(debug, 'integer_partsign', integer_part.s)
         return result
 
     def max(self, other):
@@ -677,6 +678,17 @@ def pipelined_rshift(a, b, depth):
             depth_count += 1
 
     return z
+
+def lshift_with_carry(x, shift_amount):
+
+    """shift left, but also return the bits that were shifted off the left"""
+
+    bits = x.bits
+    x = cat(x, Constant(bits, 0))
+    x >>= shift_amount
+    carry = x[bits-1:0]
+    x = x[bits*2-1:bits]
+    return x, carry
 
 def fraction_divide(dividend, divisor):
     bits = max([dividend.bits, divisor.bits])
