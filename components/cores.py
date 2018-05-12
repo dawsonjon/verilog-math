@@ -341,3 +341,12 @@ Output(unsigned_int_to_double, 'unsigned_int_to_double_z',
         )
     )
 )
+
+#mul
+complex_mul = Component()
+real_in_a = single_to_float(Input(mul, 32, 'real_in_a'))
+real_in_b = single_to_float(Input(mul, 32, 'real_in_b'))
+imag_in_a = single_to_float(Input(mul, 32, 'imag_in_a'))
+imag_in_b = single_to_float(Input(mul, 32, 'imag_in_b'))
+Output(mul, 'real_out', float_to_single(real_in_a*real_in_b + imag_in_a + imag_in_b))
+Output(mul, 'imag_out', float_to_single(real_in_a*real_in_b + imag_in_a + imag_in_b))
