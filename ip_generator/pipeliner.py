@@ -496,8 +496,9 @@ def sqrt_rounded(x):
 
 
 if __name__ == "__main__":
-    a = Input(8, 'a')
-    b = Input(8, 'b')
-    c = Input(8, 'c')
-    Output("z", Register(Register(a, 10)+b)+c)
-    print test(component, {'a':range(10), 'b':range(10), 'c':range(10)})
+    component = Component()
+    a = Input(component, 8, 'a')
+    b = Input(component, 8, 'b')
+    c = Input(component, 8, 'c')
+    Output(component, "z", Register(Register(a, 10)+b)+c)
+    print component.test({'a':range(10), 'b':range(10), 'c':range(10)})
