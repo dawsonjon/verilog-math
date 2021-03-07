@@ -1,9 +1,8 @@
 def mk_fifo(filename, depth, width):
 
     of = open(filename, "w")
-    of.write( 
-
-"""module fifo (clk, rst, data_in, data_out, data_in_stb, data_in_ack, data_out_stb, data_out_ack);
+    of.write(
+        """module fifo (clk, rst, data_in, data_out, data_in_stb, data_in_ack, data_out_stb, data_out_ack);
 
     parameter width = %u;
     parameter depth = %u;
@@ -83,5 +82,6 @@ def mk_fifo(filename, depth, width):
     assign read  = (~s_output_stb | output_ack) & ~empty;
 
 
-endmodule"""%(width, depth, int(round(ceil(math.log2(depth)))))
-)
+endmodule"""
+        % (width, depth, int(round(ceil(math.log2(depth)))))
+    )
