@@ -5,13 +5,13 @@
 
 Synthesiseable IEEE 754 floating point library in Verilog.
 
-	+ Fully pipelined, high performance
-	+ Arithmetic: Divider, Multiplier, Adder, Subtracter and Square Root
-	+ Conversions: float_to_int and int_to_float
-        + Rounding Functions: floor, ceil, truncate and nearest
-	+ Supports Denormal Numbers
-	+ Round-to-nearest (ties to even)
-        + Double and single precision versions of each function
+- Fully pipelined, high performance
+- Arithmetic: Divider, Multiplier, Adder, Subtracter and Square Root
+- Conversions: float_to_int and int_to_float
+- Rounding Functions: floor, ceil, truncate and nearest
+- Supports Denormal Numbers
+- Round-to-nearest (ties to even)
+- Double and single precision versions of each function
 
 # IP Cores
 
