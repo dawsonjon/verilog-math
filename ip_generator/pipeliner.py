@@ -65,10 +65,10 @@ class Component:
 
     def test(self, stimulus, name="uut", debug=False):
         latency = max([i.stream.offset for i in self.outputs])
-        stimulus_length = max([len(i) for i in stimulus.values()])
+        stimulus_length = max([len(i) for i in list(stimulus.values())])
         stop_clocks = stimulus_length + latency + 1
 
-        for n, s in stimulus.iteritems():
+        for n, s in stimulus.items():
             f = open("stim/"+n, 'w')
             f.write("".join(["%d\n"%i for i in s]))
             f.close()
@@ -477,7 +477,7 @@ def sqrt(x):
     #(guess + 2^bit)^2 <= x
     #guess^2 + 2*guess*2^bit + 2^bit^2 <= x
 
-    for bit in reversed(range(result_bits)):
+    for bit in reversed(list(range(result_bits))):
         new_guess_squared = guess_squared + (guess << (bit+1)) | 1<<bit*2
         better = new_guess_squared <= x
         guess_squared = select(new_guess_squared, guess_squared, better)
@@ -501,4 +501,4 @@ if __name__ == "__main__":
     b = Input(component, 8, 'b')
     c = Input(component, 8, 'c')
     Output(component, "z", Register(Register(a, 10)+b)+c)
-    print component.test({'a':range(10), 'b':range(10), 'c':range(10)})
+    print(component.test({'a':list(range(10)), 'b':list(range(10)), 'c':list(range(10))}))

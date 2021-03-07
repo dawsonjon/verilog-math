@@ -1,7 +1,7 @@
 from math import log, floor, ceil
 
-import pipeliner
-from pipeliner import *
+from . import pipeliner
+from .pipeliner import *
 
 def fselect(t, f, sel):
     assert t.e_bits == f.e_bits
@@ -73,7 +73,7 @@ class Float:
 
         return Float(z_s, z_e, z_m, z_inf, z_nan, self.e_bits, self.m_bits)
 
-    def __div__(self, other):
+    def __truediv__(self, other):
 
         #add a bit to e so that we can test for overflow
         a_e = s_resize(self.e, self.e_bits+2)

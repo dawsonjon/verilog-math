@@ -13,5 +13,5 @@ Output(st, "z",
 stimulus = {"a":[447109115412480]}
 response = st.test(stimulus)
 for a, actual in zip(stimulus['a'], response["z"]):
-    print a, actual, math.sqrt(a)
+    print(a, actual, math.sqrt(a))
 

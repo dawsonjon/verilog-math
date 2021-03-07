@@ -21,10 +21,10 @@ the Verilog code.
 
 Run Test Suite
 
-Requires python2 and Icarus Verilog
+Requires Python 3 and Icarus Verilog
 
 ..bash:
 	cd components
-	python2 test_cores.py
+	python test_cores.py
 	...
-	python2 test_double_cores.py
+	python test_double_cores.py

@@ -12,8 +12,8 @@ from multiprocessing import Process
 from math import isnan
 
 def trace(response, n):
-    for name, values in response.iteritems():
-        print name, values[n]
+    for name, values in response.items():
+        print(name, values[n])
 
 def get_mantissa(x):
     return x & 0x000fffffffffffff
@@ -45,22 +45,23 @@ def match(x, y):
         )
 
 def asdouble(x):
-    string = ""
+    string = []
     for i in range(8):
         byte = x >> 56
         byte &= 0xff
-        string += chr(byte)
+        string.append(byte)
         x <<= 8
+    string = bytes(string)
     return struct.unpack(">d", string)[0]
 
 def failure(a, b, actual, expected):
-    print "a        b        actual   expected"
-    print "======== ======== ======== ========"
-    print "%16x %16x %16x %16x fail"%(a, b, actual, expected)
-    print "a", asdouble(a)
-    print "b", asdouble(b)
-    print "actual", asdouble(actual)
-    print "expected", asdouble(expected)
+    print("a        b        actual   expected")
+    print("======== ======== ======== ========")
+    print("%16x %16x %16x %16x fail"%(a, b, actual, expected))
+    print("a", asdouble(a))
+    print("b", asdouble(b))
+    print("actual", asdouble(actual))
+    print("expected", asdouble(expected))
 
 def get_expected(core_name):
     subprocess.call("./reference_tests/"+core_name)
@@ -68,7 +69,7 @@ def get_expected(core_name):
     return [int(i) for i in inf]
 
 def test_convert(core_name, core, a):
-    print "testing", core_name, "..."
+    print("testing", core_name, "...")
     stimulus = {core_name+'_a':a}
 
     response = core.test(stimulus, name=core_name)
@@ -94,12 +95,12 @@ def test_convert(core_name, core, a):
                 result = True
         if not result:
             trace(response, n)
-            print "%08x %08x %08x fail"%(a, i, j)
+            print("%08x %08x %08x fail"%(a, i, j))
             sys.exit(1)
         n += 1
 
 def test_unary(core_name, core, a, b):
-    print "testing", core_name, "..."
+    print("testing", core_name, "...")
     stimulus = {
         core_name+'_a':a, 
     }
@@ -113,7 +114,7 @@ def test_unary(core_name, core, a, b):
         result = match(i, j)
         if not result:
             failure(a, b, i, j)
-            print "failed in vector", n
+            print("failed in vector", n)
             trace(response, n)
             #append failures to regression test file
             of = open("regression_tests", "a")
@@ -123,7 +124,7 @@ def test_unary(core_name, core, a, b):
         n += 1
 
 def test_comparator(core_name, core, a, b):
-    print "testing", core_name, "..."
+    print("testing", core_name, "...")
     stimulus = {
         core_name+'_a':a, 
         core_name+'_b':b
@@ -141,7 +142,7 @@ def test_comparator(core_name, core, a, b):
             result = True
         if not result:
             failure(a, b, i, j)
-            print n
+            print(n)
             trace(response, n)
             #append failures to regression test file
             of = open("regression_tests", "a")
@@ -151,7 +152,7 @@ def test_comparator(core_name, core, a, b):
         n += 1
 
 def test_binary(core_name, core, a, b):
-    print "testing", core_name, "..."
+    print("testing", core_name, "...")
     stimulus = {
         core_name+'_a':a, 
         core_name+'_b':b
@@ -166,7 +167,7 @@ def test_binary(core_name, core, a, b):
         result = match(j, i)
         if not result:
             failure(a, b, i, j)
-            print "failed in vector", n
+            print("failed in vector", n)
             trace(response, n)
             #append failures to regression test file
             of = open("double_regression_tests", "a")
@@ -184,7 +185,7 @@ def test_cores(stimulus_a, stimulus_b):
         "double_min":cores.double_min, 
     }
     processes = []
-    for core_name, core in binary_cores.iteritems():
+    for core_name, core in binary_cores.items():
         processes.append(
             Process(
                 target=test_binary, 
@@ -198,7 +199,7 @@ def test_cores(stimulus_a, stimulus_b):
         "int_to_double":cores.int_to_double, 
         "unsigned_int_to_double":cores.unsigned_int_to_double, 
     }
-    for core_name, core in converter_cores.iteritems():
+    for core_name, core in converter_cores.items():
         processes.append(
             Process(
                 target = test_convert,
@@ -214,7 +215,7 @@ def test_cores(stimulus_a, stimulus_b):
         "double_ceil":cores.double_ceil, 
         "double_floor":cores.double_floor, 
     }
-    for core_name, core in unary_cores.iteritems():
+    for core_name, core in unary_cores.items():
         processes.append(
             Process(
                 target = test_unary,
@@ -229,7 +230,7 @@ def test_cores(stimulus_a, stimulus_b):
         "double_eq":cores.double_eq, 
         "double_ne":cores.double_ne, 
     }
-    for core_name, core in comparator_cores.iteritems():
+    for core_name, core in comparator_cores.items():
         processes.append(
             Process(
                 target = test_comparator,
@@ -262,7 +263,7 @@ for line in inf.read().splitlines():
     stimulus_b.append(int(b))
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
 
 #corner cases
@@ -274,85 +275,85 @@ stimulus_a = [a for a, b in vectors]
 stimulus_b = [b for a, b in vectors]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
 #edge cases
-stimulus_a = [0x8000000000000000 for i in xrange(1000)]
-stimulus_b = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_a = [0x8000000000000000 for i in range(1000)]
+stimulus_b = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_a = [0x0000000000000000 for i in xrange(1000)]
-stimulus_b = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_a = [0x0000000000000000 for i in range(1000)]
+stimulus_b = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_b = [0x8000000000000000 for i in xrange(1000)]
-stimulus_a = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_b = [0x8000000000000000 for i in range(1000)]
+stimulus_a = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_b = [0x0000000000000000 for i in xrange(1000)]
-stimulus_a = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_b = [0x0000000000000000 for i in range(1000)]
+stimulus_a = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_a = [0x7FF0000000000000 for i in xrange(1000)]
-stimulus_b = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_a = [0x7FF0000000000000 for i in range(1000)]
+stimulus_b = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_a = [0xFFF0000000000000 for i in xrange(1000)]
-stimulus_b = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_a = [0xFFF0000000000000 for i in range(1000)]
+stimulus_b = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_b = [0x7FF0000000000000 for i in xrange(1000)]
-stimulus_a = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_b = [0x7FF0000000000000 for i in range(1000)]
+stimulus_a = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_b = [0xFFF0000000000000 for i in xrange(1000)]
-stimulus_a = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_b = [0xFFF0000000000000 for i in range(1000)]
+stimulus_a = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_a = [0x7FF8000000000000 for i in xrange(1000)]
-stimulus_b = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_a = [0x7FF8000000000000 for i in range(1000)]
+stimulus_b = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_a = [0xFFF8000000000000 for i in xrange(1000)]
-stimulus_b = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_a = [0xFFF8000000000000 for i in range(1000)]
+stimulus_b = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_b = [0x7FF8000000000000 for i in xrange(1000)]
-stimulus_a = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_b = [0x7FF8000000000000 for i in range(1000)]
+stimulus_a = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
-stimulus_b = [0xFFF8000000000000 for i in xrange(1000)]
-stimulus_a = [randint(0, 1<<64) for i in xrange(1000)]
+stimulus_b = [0xFFF8000000000000 for i in range(1000)]
+stimulus_a = [randint(0, 1<<64) for i in range(1000)]
 test_cores(stimulus_a, stimulus_b)
 count += len(stimulus_a)
-print count, "vectors passed"
+print(count, "vectors passed")
 
 #seed(0)
-for i in xrange(1000000):
-    stimulus_a = [randint(0, 1<<64) for i in xrange(5000)]
-    stimulus_b = [randint(0, 1<<64) for i in xrange(5000)]
+for i in range(1000000):
+    stimulus_a = [randint(0, 1<<64) for i in range(5000)]
+    stimulus_b = [randint(0, 1<<64) for i in range(5000)]
     test_cores(stimulus_a, stimulus_b)
     count += 5000
-    print count, "vectors passed"
+    print(count, "vectors passed")

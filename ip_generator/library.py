@@ -1,5 +1,5 @@
-import pipeliner
-from pipeliner import *
+from . import pipeliner
+from .pipeliner import *
 
 class FPType():
     def __init__(self, _type):
@@ -220,14 +220,14 @@ from numpy import zeros, ones
 
 pipeliner.component = Component()
 Output('z', pipelined_add(Input(8, 'a'), Input(8, 'b'), 4))
-response = pipeliner.component.test({'a':range(256), 'b':range(256)})
-print response
+response = pipeliner.component.test({'a':list(range(256)), 'b':list(range(256))})
+print(response)
 
 pipeliner.component = Component()
 Output('z', pipelined_sub(Input(8, 'a'), Input(8, 'b'), 4))
-stimulus = {'a':list(ones(256)*255), 'b':range(256)}
+stimulus = {'a':list(ones(256)*255), 'b':list(range(256))}
 response = pipeliner.component.test(stimulus)
-print response
+print(response)
 
 pipeliner.component = Component()
 Output('z',fp_add(Input(32, 'a'), Input(32, 'b')))
@@ -236,7 +236,7 @@ stimulus = {
     'b':[0x80000000, 0x3f800000, 0x3f800000, 0x3f800000]
 }
 response = pipeliner.component.test(stimulus)
-print[hex(i) for i in response["z"]]
+print([hex(i) for i in response["z"]])
 
 
 #Output("z", leading_zeros(Input(8, "a")))
