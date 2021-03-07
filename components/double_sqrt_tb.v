@@ -16,7 +16,7 @@ module double_sqrt_tb;
 
   initial
   begin
-    #50110 $finish;
+    #10110 $finish;
   end
 
   initial

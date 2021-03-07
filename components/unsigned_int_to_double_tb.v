@@ -16,7 +16,7 @@ module unsigned_int_to_double_tb;
 
   initial
   begin
-    #50060 $finish;
+    #10060 $finish;
   end
 
   initial

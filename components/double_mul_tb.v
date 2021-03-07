@@ -20,7 +20,7 @@ module double_mul_tb;
 
   initial
   begin
-    #50220 $finish;
+    #10220 $finish;
   end
 
   initial

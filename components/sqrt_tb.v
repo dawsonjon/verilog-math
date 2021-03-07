@@ -16,7 +16,7 @@ module sqrt_tb;
 
   initial
   begin
-    #4570 $finish;
+    #50110 $finish;
   end
 
   initial

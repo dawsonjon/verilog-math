@@ -20,7 +20,7 @@ module gt_tb;
 
   initial
   begin
-    #4540 $finish;
+    #50080 $finish;
   end
 
   initial

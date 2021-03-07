@@ -20,7 +20,7 @@ module double_div_tb;
 
   initial
   begin
-    #50660 $finish;
+    #10660 $finish;
   end
 
   initial

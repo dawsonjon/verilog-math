@@ -16,7 +16,7 @@ module single_to_int_tb;
 
   initial
   begin
-    #4490 $finish;
+    #50030 $finish;
   end
 
   initial

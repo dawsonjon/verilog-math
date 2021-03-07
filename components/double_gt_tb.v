@@ -20,7 +20,7 @@ module double_gt_tb;
 
   initial
   begin
-    #50080 $finish;
+    #10080 $finish;
   end
 
   initial

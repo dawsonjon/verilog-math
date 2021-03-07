@@ -16,7 +16,7 @@ module unsigned_int_to_single_tb;
 
   initial
   begin
-    #4520 $finish;
+    #50060 $finish;
   end
 
   initial

@@ -16,7 +16,7 @@ module neg_tb;
 
   initial
   begin
-    #4470 $finish;
+    #50010 $finish;
   end
 
   initial

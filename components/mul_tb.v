@@ -20,7 +20,7 @@ module mul_tb;
 
   initial
   begin
-    #4560 $finish;
+    #50100 $finish;
   end
 
   initial

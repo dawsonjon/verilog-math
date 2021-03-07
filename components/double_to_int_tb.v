@@ -16,7 +16,7 @@ module double_to_int_tb;
 
   initial
   begin
-    #50030 $finish;
+    #10030 $finish;
   end
 
   initial

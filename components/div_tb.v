@@ -20,7 +20,7 @@ module div_tb;
 
   initial
   begin
-    #4830 $finish;
+    #50370 $finish;
   end
 
   initial

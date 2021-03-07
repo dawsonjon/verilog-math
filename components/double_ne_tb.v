@@ -20,7 +20,7 @@ module double_ne_tb;
 
   initial
   begin
-    #50010 $finish;
+    #10010 $finish;
   end
 
   initial
